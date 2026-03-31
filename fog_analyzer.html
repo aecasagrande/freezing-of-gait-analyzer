@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOG Analyzer — PD-HRV</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0e0f11;
+    --surface: #16181c;
+    --surface2: #1e2026;
+    --border: #2a2d35;
+    --border2: #353840;
+    --text: #e8eaf0;
+    --muted: #6b7180;
+    --accent: #4fc3f7;
+    --accent2: #81d4fa;
+    --off-color: #ef9a9a;
+    --on-color: #a5d6a7;
+    --fog-color: #ffcc80;
+    --akinetic: #ce93d8;
+    --kinetic-t: #ff8a65;
+    --kinetic-nt: #80cbc4;
+    --festination: #f48fb1;
+    --r: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.2rem;
+  }
+
+  header h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+
+  header span {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .drop-zone {
+    border: 1.5px dashed var(--border2);
+    border-radius: var(--r);
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(79,195,247,0.04);
+  }
+
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .drop-icon {
+    width: 36px; height: 36px;
+    margin: 0 auto 1rem;
+    color: var(--muted);
+  }
+
+  .drop-zone p {
+    font-size: 0.88rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .drop-zone p strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .drop-zone .formats {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--accent);
+    margin-top: 0.4rem;
+  }
+
+  .files-loaded {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .file-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .file-chip .state-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+  }
+
+  .file-chip .remove {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1;
+    margin-left: 0.2rem;
+  }
+
+  .file-chip .remove:hover { color: var(--off-color); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1.2rem;
+    border-radius: var(--r);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .btn-primary { background: var(--accent); color: #0e0f11; }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--border2); }
+
+  .controls {
+    display: flex;
+    gap: 0.7rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  #results { display: none; }
+
+  /* Summary cards */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 1.1rem 1.2rem;
+  }
+
+  .stat-card .label {
+    font-size: 0.7rem;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.4rem;
+  }
+
+  .stat-card .value {
+    font-size: 1.7rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .stat-card .sub {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+  }
+
+  /* Section titles */
+  .section-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Manifestation bar */
+  .manif-bar-wrap { margin-bottom: 2rem; }
+
+  .manif-row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.82rem;
+  }
+
+  .manif-label {
+    width: 160px;
+    flex-shrink: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .manif-bar-bg {
+    flex: 1;
+    height: 14px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .manif-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+  }
+
+  .manif-count {
+    width: 60px;
+    text-align: right;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  /* Per-task table */
+  .task-table-wrap {
+    overflow-x: auto;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+  }
+
+  thead th {
+    background: var(--surface);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    padding: 0.7rem 0.9rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+  tbody td {
+    padding: 0.65rem 0.9rem;
+    vertical-align: middle;
+  }
+
+  td.task-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent2);
+    white-space: nowrap;
+  }
+
+  .state-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.18rem 0.55rem;
+    border-radius: 20px;
+    font-size: 0.68rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+  }
+
+  .badge-off { background: rgba(239,154,154,0.12); color: var(--off-color); }
+  .badge-on  { background: rgba(165,214,167,0.12); color: var(--on-color); }
+
+  .pct-cell { font-family: 'IBM Plex Mono', monospace; font-weight: 500; }
+
+  .mini-bar-wrap { display: flex; align-items: center; gap: 0.5rem; }
+  .mini-bar-bg { width: 60px; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+  .mini-bar-fill { height: 100%; background: var(--fog-color); border-radius: 3px; transition: width 0.4s; }
+
+  .pill-list { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .pill {
+    padding: 0.15rem 0.45rem;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-family: 'IBM Plex Mono', monospace;
+    white-space: nowrap;
+  }
+
+  .pill-akinetic    { background: rgba(206,147,216,0.15); color: var(--akinetic); }
+  .pill-kinetic-t   { background: rgba(255,138,101,0.15); color: var(--kinetic-t); }
+  .pill-kinetic-nt  { background: rgba(128,203,196,0.15); color: var(--kinetic-nt); }
+  .pill-festination { background: rgba(244,143,177,0.15); color: var(--festination); }
+  .pill-none        { background: var(--surface2); color: var(--muted); }
+
+  /* ON vs OFF comparison */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .compare-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 1.2rem;
+  }
+
+  .compare-card h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .compare-card.off-card h3 { color: var(--off-color); }
+  .compare-card.on-card h3  { color: var(--on-color); }
+
+  .compare-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8rem;
+  }
+
+  .compare-stat:last-child { border-bottom: none; }
+  .compare-stat .cs-label { color: var(--muted); font-size: 0.75rem; }
+  .compare-stat .cs-val { font-family: 'IBM Plex Mono', monospace; font-weight: 500; }
+
+  .no-data { color: var(--muted); font-size: 0.8rem; font-family: 'IBM Plex Mono', monospace; padding: 2rem; text-align: center; }
+
+  .error-msg {
+    background: rgba(239,154,154,0.08);
+    border: 1px solid rgba(239,154,154,0.2);
+    border-radius: var(--r);
+    padding: 0.8rem 1rem;
+    font-size: 0.8rem;
+    color: var(--off-color);
+    margin-bottom: 1rem;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  @media (max-width: 600px) {
+    body { padding: 1rem; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .manif-label { width: 110px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FOG_ANALYZER</h1>
+  <span>ELAN export → FOG metrics · PD-HRV</span>
+</header>
+
+<div class="drop-zone" id="dropZone">
+  <input type="file" id="fileInput" accept=".txt,.tsv" multiple>
+  <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M16 12l-4-4-4 4M12 8v8"/>
+  </svg>
+  <p><strong>Drop ELAN .txt export files here</strong><br>or click to browse — multiple files supported</p>
+  <p class="formats">PDHRV_sub&lt;id&gt;_ses&lt;n&gt;_&lt;state&gt;_&lt;task&gt;_*.txt</p>
+</div>
+
+<div class="files-loaded" id="fileChips"></div>
+<div id="errorBox"></div>
+
+<div class="controls">
+  <button class="btn btn-primary" id="analyzeBtn" disabled onclick="runAnalysis()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Analyse
+  </button>
+  <button class="btn btn-ghost" id="clearBtn" onclick="clearAll()">Clear</button>
+</div>
+
+<div id="results">
+  <div class="section-title">Overall summary</div>
+  <div class="summary-grid" id="summaryGrid"></div>
+
+  <div class="section-title">FOG manifestation types</div>
+  <div class="manif-bar-wrap" id="manifBars"></div>
+
+  <div id="compareSection">
+    <div class="section-title">OFF vs ON comparison</div>
+    <div class="compare-grid" id="compareGrid"></div>
+  </div>
+
+  <div class="section-title">Per-task breakdown</div>
+  <div class="task-table-wrap">
+    <table id="taskTable">
+      <thead>
+        <tr>
+          <th>Task</th>
+          <th>State</th>
+          <th>Trial duration (s)</th>
+          <th>FOG episodes</th>
+          <th>Total FOG (s)</th>
+          <th>% time frozen</th>
+          <th>Avg episode (s)</th>
+          <th>Manifestations</th>
+        </tr>
+      </thead>
+      <tbody id="taskTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const fileMap = new Map(); // filename -> parsed data
+
+// ── Parse hh:mm:ss.ms to seconds ────────────────────────────────────────────
+function parseTime(str) {
+  if (!str) return null;
+  const m = str.trim().match(/^(\d+):(\d+):(\d+)\.(\d+)$/);
+  if (!m) return null;
+  return +m[1]*3600 + +m[2]*60 + +m[3] + +m[4]/Math.pow(10, m[4].length);
+}
+
+// ── Extract metadata from filename ──────────────────────────────────────────
+function parseName(filename) {
+  // e.g. PDHRV_sub004_ses01_off_giladi_stwalk_front_blur
+  const base = filename.replace(/\.[^.]+$/, '');
+  const parts = base.toLowerCase().split('_');
+  const stateIdx = parts.findIndex(p => p === 'off' || p === 'on');
+  const state = stateIdx >= 0 ? parts[stateIdx].toUpperCase() : 'UNKNOWN';
+  // task = join parts after state up to 'front'/'sag'/'rear'
+  const camKeywords = ['front','sag','sagittal','rear','side','lateral'];
+  let taskParts = [];
+  for (let i = stateIdx+1; i < parts.length; i++) {
+    if (camKeywords.includes(parts[i]) || parts[i] === 'blur') break;
+    taskParts.push(parts[i]);
+  }
+  const task = taskParts.join('_');
+  return { state, task, fullName: base };
+}
+
+// ── Parse ELAN tab-delimited export ─────────────────────────────────────────
+function parseElan(text, filename) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return null;
+
+  const header = lines[0].split('\t').map(h => h.trim());
+  const col = name => header.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
+
+  const cDurSec  = col('Duration - hh');
+  const cTask    = col('Task');
+  const cFOG     = col('FOG');
+  const cManif   = col('Manifestation');
+  const cFest    = col('Festination');
+  const cBeginSec= col('Begin Time - hh');
+  const cEndSec  = col('End Time - hh');
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split('\t');
+    if (cells.length < 4) continue;
+    rows.push({
+      begin:     parseTime(cells[cBeginSec]),
+      end:       parseTime(cells[cEndSec]),
+      dur:       parseTime(cells[cDurSec]),
+      task:      (cells[cTask] || '').trim(),
+      fog:       (cells[cFOG]  || '').trim(),
+      manif:     (cells[cManif]|| '').trim(),
+      fest:      (cells[cFest] || '').trim(),
+    });
+  }
+
+  // Trial duration = duration of the "Trajectory" row
+  const traj = rows.find(r => r.task.toLowerCase() === 'trajectory');
+  const trialDuration = traj ? traj.dur : null;
+
+  // FOG episodes = rows where FOG column is non-empty
+  const fogRows = rows.filter(r => r.fog !== '');
+
+  // Total FOG time (sum of durations)
+  const totalFog = fogRows.reduce((s, r) => s + (r.dur || 0), 0);
+
+  // Manifestation counts (include Manifestation AND Festination columns)
+  const manifCounts = {};
+  rows.forEach(r => {
+    const types = [];
+    if (r.manif) types.push(r.manif);
+    if (r.fest)  types.push(r.fest + ' (festination)');
+    types.forEach(t => { manifCounts[t] = (manifCounts[t]||0) + 1; });
+  });
+
+  const meta = parseName(filename);
+  return {
+    ...meta,
+    filename,
+    trialDuration,
+    fogEpisodes: fogRows.length,
+    totalFog,
+    pctFrozen: trialDuration ? (totalFog / trialDuration) * 100 : null,
+    avgEpisode: fogRows.length ? totalFog / fogRows.length : 0,
+    manifCounts,
+    fogRows,
+    rows,
+  };
+}
+
+// ── File handling ────────────────────────────────────────────────────────────
+function loadFile(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = e => res({ name: file.name, text: e.target.result });
+    reader.onerror = () => rej(file.name);
+    reader.readAsText(file);
+  });
+}
+
+async function addFiles(files) {
+  clearErrors();
+  for (const file of files) {
+    if (fileMap.has(file.name)) continue;
+    try {
+      const { text } = await loadFile(file);
+      const data = parseElan(text, file.name);
+      if (!data) { showError(`Could not parse: ${file.name}`); continue; }
+      fileMap.set(file.name, data);
+    } catch { showError(`Error reading: ${file.name}`); }
+  }
+  renderChips();
+  document.getElementById('analyzeBtn').disabled = fileMap.size === 0;
+}
+
+function renderChips() {
+  const wrap = document.getElementById('fileChips');
+  wrap.innerHTML = '';
+  for (const [name, d] of fileMap) {
+    const chip = document.createElement('div');
+    chip.className = 'file-chip';
+    const dotColor = d.state === 'OFF' ? 'var(--off-color)' : d.state === 'ON' ? 'var(--on-color)' : 'var(--muted)';
+    chip.innerHTML = `<span class="state-dot" style="background:${dotColor}"></span>${d.task || name}<span class="remove" data-name="${name}" title="Remove">×</span>`;
+    chip.querySelector('.remove').addEventListener('click', e => {
+      fileMap.delete(e.target.dataset.name);
+      renderChips();
+      document.getElementById('analyzeBtn').disabled = fileMap.size === 0;
+    });
+    wrap.appendChild(chip);
+  }
+}
+
+function clearAll() {
+  fileMap.clear(); renderChips(); clearErrors();
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('fileInput').value = '';
+}
+
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  const d = document.createElement('div'); d.className = 'error-msg'; d.textContent = '⚠ ' + msg;
+  box.appendChild(d);
+}
+function clearErrors() { document.getElementById('errorBox').innerHTML = ''; }
+
+// ── Drag & drop ──────────────────────────────────────────────────────────────
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); addFiles(e.dataTransfer.files); });
+document.getElementById('fileInput').addEventListener('change', e => addFiles(e.target.files));
+
+// ── Analysis ─────────────────────────────────────────────────────────────────
+function runAnalysis() {
+  const all = [...fileMap.values()];
+  if (!all.length) return;
+
+  document.getElementById('results').style.display = 'block';
+  renderSummary(all);
+  renderManifBars(all);
+  renderCompare(all);
+  renderTaskTable(all);
+}
+
+function fmt(n, dec=2) { return n == null ? '—' : (+n).toFixed(dec); }
+
+function renderSummary(all) {
+  const totalEpisodes = all.reduce((s,d) => s + d.fogEpisodes, 0);
+  const totalFogSec   = all.reduce((s,d) => s + d.totalFog, 0);
+  const totalTrialSec = all.reduce((s,d) => s + (d.trialDuration||0), 0);
+  const pct = totalTrialSec ? (totalFogSec/totalTrialSec)*100 : null;
+  const avgEp = totalEpisodes ? totalFogSec/totalEpisodes : 0;
+
+  const g = document.getElementById('summaryGrid');
+  g.innerHTML = `
+    <div class="stat-card"><div class="label">Files loaded</div><div class="value" style="color:var(--accent)">${all.length}</div><div class="sub">trials</div></div>
+    <div class="stat-card"><div class="label">FOG episodes</div><div class="value" style="color:var(--fog-color)">${totalEpisodes}</div><div class="sub">total across all trials</div></div>
+    <div class="stat-card"><div class="label">Total FOG time</div><div class="value" style="color:var(--fog-color)">${fmt(totalFogSec,1)}<span style="font-size:1rem;font-weight:400"> s</span></div><div class="sub">${fmt(totalFogSec/60,1)} min</div></div>
+    <div class="stat-card"><div class="label">% time frozen</div><div class="value" style="color:${pct>20?'var(--off-color)':'var(--text)'}">${pct!=null?fmt(pct,1)+'%':'—'}</div><div class="sub">of total trial time</div></div>
+    <div class="stat-card"><div class="label">Avg episode duration</div><div class="value">${fmt(avgEp,2)}<span style="font-size:1rem;font-weight:400"> s</span></div><div class="sub">mean ± across episodes</div></div>
+  `;
+}
+
+function renderManifBars(all) {
+  const counts = {};
+  all.forEach(d => Object.entries(d.manifCounts).forEach(([k,v]) => { counts[k]=(counts[k]||0)+v; }));
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const max = sorted.length ? sorted[0][1] : 1;
+
+  const colorMap = {
+    'Akinetic': 'var(--akinetic)',
+    'Kinetic_trembling': 'var(--kinetic-t)',
+    'Kinetic_no_trembling': 'var(--kinetic-nt)',
+  };
+  const getColor = k => {
+    if (k.includes('Akinetic')) return 'var(--akinetic)';
+    if (k.toLowerCase().includes('trembling') && !k.toLowerCase().includes('no_')) return 'var(--kinetic-t)';
+    if (k.toLowerCase().includes('no_trembling')) return 'var(--kinetic-nt)';
+    return 'var(--festination)';
+  };
+
+  const wrap = document.getElementById('manifBars');
+  if (!sorted.length) { wrap.innerHTML = '<div class="no-data">No manifestation annotations found.</div>'; return; }
+  wrap.innerHTML = sorted.map(([k,v]) => `
+    <div class="manif-row">
+      <div class="manif-label">${k}</div>
+      <div class="manif-bar-bg"><div class="manif-bar-fill" style="width:${(v/max*100).toFixed(1)}%;background:${getColor(k)}"></div></div>
+      <div class="manif-count">${v}×</div>
+    </div>`).join('');
+}
+
+function renderCompare(all) {
+  const section = document.getElementById('compareSection');
+  const offData = all.filter(d => d.state === 'OFF');
+  const onData  = all.filter(d => d.state === 'ON');
+
+  if (!offData.length && !onData.length) { section.style.display = 'none'; return; }
+  if (!offData.length || !onData.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  function aggStats(arr) {
+    const eps = arr.reduce((s,d)=>s+d.fogEpisodes,0);
+    const fog = arr.reduce((s,d)=>s+d.totalFog,0);
+    const tri = arr.reduce((s,d)=>s+(d.trialDuration||0),0);
+    return { eps, fog, tri, pct: tri?(fog/tri*100):null, avg: eps?fog/eps:0 };
+  }
+
+  const off = aggStats(offData);
+  const on  = aggStats(onData);
+
+  function card(label, cls, data) {
+    return `<div class="compare-card ${cls}">
+      <h3>${label} STATE (${cls==='off-card'?offData.length:onData.length} trials)</h3>
+      <div class="compare-stat"><span class="cs-label">FOG episodes</span><span class="cs-val">${data.eps}</span></div>
+      <div class="compare-stat"><span class="cs-label">Total FOG time</span><span class="cs-val">${fmt(data.fog,2)} s</span></div>
+      <div class="compare-stat"><span class="cs-label">% time frozen</span><span class="cs-val">${data.pct!=null?fmt(data.pct,1)+'%':'—'}</span></div>
+      <div class="compare-stat"><span class="cs-label">Avg episode</span><span class="cs-val">${fmt(data.avg,2)} s</span></div>
+    </div>`;
+  }
+
+  document.getElementById('compareGrid').innerHTML =
+    card('OFF', 'off-card', off) + card('ON', 'on-card', on);
+}
+
+function manifPills(counts) {
+  if (!Object.keys(counts).length) return '<span class="pill pill-none">none</span>';
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([k,v]) => {
+    let cls = 'pill-kinetic-nt';
+    if (k.includes('Akinetic')) cls = 'pill-akinetic';
+    else if (k.toLowerCase().includes('trembling') && !k.toLowerCase().includes('no_')) cls = 'pill-kinetic-t';
+    else if (k.toLowerCase().includes('festination')) cls = 'pill-festination';
+    return `<span class="pill ${cls}">${k} ×${v}</span>`;
+  }).join('');
+}
+
+function renderTaskTable(all) {
+  const sorted = [...all].sort((a,b) => {
+    if (a.state !== b.state) return a.state < b.state ? -1 : 1;
+    return a.task.localeCompare(b.task);
+  });
+
+  const tbody = document.getElementById('taskTableBody');
+  tbody.innerHTML = sorted.map(d => {
+    const badgeCls = d.state === 'OFF' ? 'badge-off' : d.state === 'ON' ? 'badge-on' : '';
+    const pct = d.pctFrozen != null ? d.pctFrozen : null;
+    const barW = pct != null ? Math.min(pct, 100).toFixed(1) : 0;
+    return `<tr>
+      <td class="task-name">${d.task || d.filename}</td>
+      <td><span class="state-badge ${badgeCls}">${d.state}</span></td>
+      <td>${d.trialDuration != null ? fmt(d.trialDuration,2) : '—'}</td>
+      <td>${d.fogEpisodes}</td>
+      <td>${fmt(d.totalFog,3)}</td>
+      <td class="pct-cell">
+        <div class="mini-bar-wrap">
+          <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${barW}%"></div></div>
+          ${pct!=null ? fmt(pct,1)+'%' : '—'}
+        </div>
+      </td>
+      <td>${d.fogEpisodes ? fmt(d.avgEpisode,3) : '—'}</td>
+      <td><div class="pill-list">${manifPills(d.manifCounts)}</div></td>
+    </tr>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
