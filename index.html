@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FOG Analyzer — PD-HRV</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
   :root {
@@ -37,42 +38,21 @@
     padding: 2rem;
   }
   header {
-    display: flex;
-    align-items: baseline;
-    gap: 1rem;
+    display: flex; align-items: baseline; gap: 1rem;
     margin-bottom: 2.5rem;
     border-bottom: 1px solid var(--border);
     padding-bottom: 1.2rem;
   }
-  header h1 {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 1.1rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    color: var(--accent);
-  }
-  header span {
-    font-size: 0.78rem;
-    color: var(--muted);
-    font-family: 'IBM Plex Mono', monospace;
-  }
+  header h1 { font-family: 'IBM Plex Mono', monospace; font-size: 1.1rem; font-weight: 600; letter-spacing: 0.08em; color: var(--accent); }
+  header span { font-size: 0.78rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
   .drop-zone {
-    border: 1.5px dashed var(--border2);
-    border-radius: var(--r);
-    padding: 3rem 2rem;
-    text-align: center;
-    cursor: pointer;
+    border: 1.5px dashed var(--border2); border-radius: var(--r);
+    padding: 3rem 2rem; text-align: center; cursor: pointer;
     transition: border-color 0.2s, background 0.2s;
-    margin-bottom: 2rem;
-    position: relative;
+    margin-bottom: 2rem; position: relative;
   }
-  .drop-zone:hover, .drop-zone.drag-over {
-    border-color: var(--accent);
-    background: rgba(79,195,247,0.04);
-  }
-  .drop-zone input[type="file"] {
-    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
-  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: rgba(79,195,247,0.04); }
+  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
   .drop-icon { width: 36px; height: 36px; margin: 0 auto 1rem; color: var(--muted); }
   .drop-zone p { font-size: 0.88rem; color: var(--muted); line-height: 1.6; }
   .drop-zone p strong { color: var(--text); font-weight: 500; }
@@ -84,7 +64,8 @@
     background: var(--surface2); border: 1px solid var(--border);
     border-radius: 20px; font-size: 0.75rem; font-family: 'IBM Plex Mono', monospace;
   }
-  .file-chip .state-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .file-chip.csv-chip { border-color: rgba(121,134,203,0.35); background: rgba(121,134,203,0.07); }
+  .file-chip .state-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   .file-chip .remove { cursor: pointer; color: var(--muted); font-size: 0.9rem; line-height: 1; margin-left: 0.2rem; }
   .file-chip .remove:hover { color: var(--off-color); }
   .btn {
@@ -117,11 +98,49 @@
   .manif-bar-bg { flex: 1; height: 14px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
   .manif-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
   .manif-count { width: 60px; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--muted); }
-  /* Per-task table */
-  .task-table-wrap {
-    overflow-x: auto; margin-bottom: 2rem;
-    border: 1px solid var(--border); border-radius: var(--r);
+
+  /* ── Charts ──────────────────────────────────────────── */
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1.1rem 1.2rem; }
+  .chart-card-full { grid-column: 1 / -1; }
+  .chart-card-title {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--muted); margin-bottom: 0.75rem;
+    display: flex; align-items: center; justify-content: space-between;
   }
+  .chart-card-title .r-badge {
+    font-size: 0.65rem; padding: 0.12rem 0.45rem; border-radius: 20px;
+    background: var(--surface2); border: 1px solid var(--border);
+  }
+  .chart-canvas-wrap { position: relative; height: 230px; }
+  .chart-canvas-wrap.tall { height: 280px; }
+
+  /* Correlation table */
+  .corr-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 0.5rem; }
+  .corr-table th {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--muted); padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid var(--border); text-align: left;
+  }
+  .corr-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; vertical-align: middle; }
+  .corr-table tr:last-child td { border-bottom: none; }
+  .corr-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .r-val { font-weight: 600; font-size: 0.8rem; }
+  .r-strong-pos { color: #a5d6a7; }
+  .r-moderate-pos { color: #ffcc80; }
+  .r-weak { color: var(--muted); }
+  .r-neg { color: #ef9a9a; }
+  .n-label { color: var(--muted2); font-size: 0.65rem; }
+  .interp-bar { display: inline-block; height: 5px; border-radius: 3px; vertical-align: middle; margin-left: 0.4rem; }
+  .no-csv-msg {
+    display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 0.6rem;
+    padding: 2rem; text-align: center;
+    color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem;
+  }
+  .no-csv-msg svg { color: var(--muted2); }
+
+  /* Per-task table */
+  .task-table-wrap { overflow-x: auto; margin-bottom: 2rem; border: 1px solid var(--border); border-radius: var(--r); }
   table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
   thead th {
     background: var(--surface); font-family: 'IBM Plex Mono', monospace;
@@ -131,41 +150,22 @@
   }
   tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
   tbody tr:last-child { border-bottom: none; }
-
-  /* Subject group row */
   tr.subject-row td {
     background: rgba(121,134,203,0.08);
     border-top: 1px solid rgba(121,134,203,0.25);
     border-bottom: 1px solid rgba(121,134,203,0.15);
     padding: 0.5rem 0.9rem;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--subject-accent);
-    letter-spacing: 0.1em;
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; font-weight: 600;
+    color: var(--subject-accent); letter-spacing: 0.1em;
   }
-  tr.subject-row td span.sub-meta {
-    font-weight: 400;
-    color: var(--muted);
-    margin-left: 0.8rem;
-    font-size: 0.68rem;
-    letter-spacing: 0.05em;
-  }
-
-  /* State group row */
+  tr.subject-row td span.sub-meta { font-weight: 400; color: var(--muted); margin-left: 0.8rem; font-size: 0.68rem; letter-spacing: 0.05em; }
   tr.state-group-row td {
-    background: var(--surface);
-    padding: 0.38rem 0.9rem 0.38rem 2rem;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
-    font-weight: 500;
+    background: var(--surface); padding: 0.38rem 0.9rem 0.38rem 2rem;
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; letter-spacing: 0.08em; font-weight: 500;
     border-bottom: 1px solid var(--border);
   }
   tr.state-group-row.state-off td { color: var(--off-color); background: rgba(239,154,154,0.05); }
   tr.state-group-row.state-on  td { color: var(--on-color);  background: rgba(165,214,167,0.05); }
-
-  /* Task data row */
   tr.task-row { cursor: pointer; }
   tr.task-row:hover { background: rgba(255,255,255,0.025); }
   tr.task-row.expanded { background: rgba(79,195,247,0.04); }
@@ -175,65 +175,28 @@
     background: var(--surface2); border: 1px solid var(--border);
     border-radius: 4px; padding: 0.18rem 0.5rem;
     font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem;
-    color: var(--muted); cursor: pointer; transition: all 0.15s;
-    white-space: nowrap;
+    color: var(--muted); cursor: pointer; transition: all 0.15s; white-space: nowrap;
   }
   .expand-btn:hover { border-color: var(--accent); color: var(--accent); }
   .expand-btn .arrow { transition: transform 0.2s; display: inline-block; }
   .expand-btn.open .arrow { transform: rotate(90deg); }
-
-  /* Episode detail row */
-  tr.episode-detail-row td {
-    padding: 0 !important;
-    background: var(--bg);
-    border-bottom: 2px solid var(--border) !important;
-  }
+  tr.episode-detail-row td { padding: 0 !important; background: var(--bg); border-bottom: 2px solid var(--border) !important; }
   tr.episode-detail-row.hidden { display: none; }
-  .episode-inner {
-    padding: 0.7rem 0.9rem 0.7rem 2.8rem;
-    border-top: 1px solid var(--border);
-  }
-  .episode-table-label {
-    font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem;
-    color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase;
-    margin-bottom: 0.5rem;
-  }
-  table.episode-table {
-    width: auto;
-    min-width: 500px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    overflow: hidden;
-    background: var(--surface);
-  }
-  table.episode-table thead th {
-    background: var(--surface2);
-    font-size: 0.62rem;
-    padding: 0.4rem 0.7rem;
-    color: var(--muted);
-    border-bottom: 1px solid var(--border);
-  }
+  .episode-inner { padding: 0.7rem 0.9rem 0.7rem 2.8rem; border-top: 1px solid var(--border); }
+  .episode-table-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  table.episode-table { width: auto; min-width: 500px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; background: var(--surface); }
+  table.episode-table thead th { background: var(--surface2); font-size: 0.62rem; padding: 0.4rem 0.7rem; color: var(--muted); border-bottom: 1px solid var(--border); }
   table.episode-table tbody tr { border-bottom: 1px solid var(--border); }
   table.episode-table tbody tr:last-child { border-bottom: none; }
   table.episode-table tbody tr:hover { background: rgba(255,255,255,0.02); }
-  table.episode-table tbody td {
-    padding: 0.35rem 0.7rem;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.72rem;
-    vertical-align: middle;
-  }
+  table.episode-table tbody td { padding: 0.35rem 0.7rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; vertical-align: middle; }
   .ep-num { color: var(--muted); font-size: 0.65rem; }
   .ep-time { color: var(--text); }
   .ep-dur { color: var(--fog-color); font-weight: 500; }
   .ep-dur-bar-bg { display: inline-block; width: 50px; height: 5px; background: var(--surface2); border-radius: 2px; vertical-align: middle; margin-right: 0.4rem; overflow: hidden; }
   .ep-dur-bar-fill { height: 100%; background: var(--fog-color); border-radius: 2px; }
   .no-episodes { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--muted2); padding: 0.5rem 0; }
-
-  .state-badge {
-    display: inline-flex; align-items: center; gap: 0.3rem;
-    padding: 0.18rem 0.55rem; border-radius: 20px;
-    font-size: 0.68rem; font-family: 'IBM Plex Mono', monospace; font-weight: 500;
-  }
+  .state-badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.18rem 0.55rem; border-radius: 20px; font-size: 0.68rem; font-family: 'IBM Plex Mono', monospace; font-weight: 500; }
   .badge-off { background: rgba(239,154,154,0.12); color: var(--off-color); }
   .badge-on  { background: rgba(165,214,167,0.12); color: var(--on-color); }
   .pct-cell { font-family: 'IBM Plex Mono', monospace; font-weight: 500; }
@@ -247,8 +210,6 @@
   .pill-kinetic-nt  { background: rgba(128,203,196,0.15); color: var(--kinetic-nt); }
   .pill-festination { background: rgba(244,143,177,0.15); color: var(--festination); }
   .pill-none        { background: var(--surface2); color: var(--muted); }
-
-  /* ON vs OFF comparison */
   .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
   .compare-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1.2rem; }
   .compare-card h3 { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; margin-bottom: 1rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
@@ -260,39 +221,35 @@
   .compare-stat .cs-val { font-family: 'IBM Plex Mono', monospace; font-weight: 500; }
   .no-data { color: var(--muted); font-size: 0.8rem; font-family: 'IBM Plex Mono', monospace; padding: 2rem; text-align: center; }
   .error-msg { background: rgba(239,154,154,0.08); border: 1px solid rgba(239,154,154,0.2); border-radius: var(--r); padding: 0.8rem 1rem; font-size: 0.8rem; color: var(--off-color); margin-bottom: 1rem; font-family: 'IBM Plex Mono', monospace; }
-
-  /* Subject summary cards in compare section */
   .subject-compare-wrap { margin-bottom: 2rem; }
   .subject-compare-block { margin-bottom: 1.5rem; }
-  .subject-compare-block h3 {
-    font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem;
-    color: var(--subject-accent); letter-spacing: 0.1em; text-transform: uppercase;
-    margin-bottom: 0.7rem; padding-bottom: 0.4rem;
-    border-bottom: 1px solid rgba(121,134,203,0.2);
-  }
-
-  @media (max-width: 600px) {
+  .subject-compare-block h3 { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--subject-accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.7rem; padding-bottom: 0.4rem; border-bottom: 1px solid rgba(121,134,203,0.2); }
+  @media (max-width: 700px) {
     body { padding: 1rem; }
     .compare-grid { grid-template-columns: 1fr; }
     .manif-label { width: 110px; }
+    .charts-grid { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
 <header>
   <h1>FOG_ANALYZER</h1>
-  <span>ELAN export → FOG metrics · PD-HRV</span>
+  <span>ELAN export + Trial Sheets → FOG metrics &amp; Giladi correlation · PD-HRV</span>
 </header>
+
 <div class="drop-zone" id="dropZone">
-  <input type="file" id="fileInput" accept=".txt,.tsv" multiple>
+  <input type="file" id="fileInput" accept=".txt,.tsv,.csv" multiple>
   <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
     <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M16 12l-4-4-4 4M12 8v8"/>
   </svg>
-  <p><strong>Drop ELAN .txt export files here</strong><br>or click to browse — multiple files supported</p>
-  <p class="formats">PDHRV_sub&lt;id&gt;_ses&lt;n&gt;_&lt;state&gt;_&lt;task&gt;_*.txt</p>
+  <p><strong>Drop ELAN .txt exports and/or Trial Sheet .csv files here</strong><br>Multiple files supported — mix both types freely</p>
+  <p class="formats">PDHRV_sub&lt;id&gt;_ses&lt;n&gt;_&lt;state&gt;_&lt;task&gt;_*.txt · P-XXX_TrialRunSheet_*.csv</p>
 </div>
+
 <div class="files-loaded" id="fileChips"></div>
 <div id="errorBox"></div>
+
 <div class="controls">
   <button class="btn btn-primary" id="analyzeBtn" disabled onclick="runAnalysis()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -300,11 +257,69 @@
   </button>
   <button class="btn btn-ghost" id="clearBtn" onclick="clearAll()">Clear</button>
 </div>
+
 <div id="results">
   <div class="section-title">Overall summary</div>
   <div class="summary-grid" id="summaryGrid"></div>
+
   <div class="section-title">FOG manifestation types</div>
   <div class="manif-bar-wrap" id="manifBars"></div>
+
+  <!-- ── Visual Analytics Charts ───────────────────────────────────── -->
+  <div class="section-title">Visual analytics</div>
+  <div class="charts-grid" id="chartsGrid">
+    <div class="chart-card">
+      <div class="chart-card-title">% Time Frozen — by Subject</div>
+      <div class="chart-canvas-wrap"><canvas id="chartPctFrozen"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">FOG Episode Count — by Subject</div>
+      <div class="chart-canvas-wrap"><canvas id="chartEpisodeCount"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">Avg Episode Duration (s) — by Subject</div>
+      <div class="chart-canvas-wrap"><canvas id="chartAvgDuration"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-title">Manifestation Type Distribution</div>
+      <div class="chart-canvas-wrap"><canvas id="chartManif"></canvas></div>
+    </div>
+    <div class="chart-card chart-card-full">
+      <div class="chart-card-title">% Time Frozen — by Task (across subjects)</div>
+      <div class="chart-canvas-wrap"><canvas id="chartByTask"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Giladi ↔ ELAN Correlation ─────────────────────────────────── -->
+  <div class="section-title">Giladi ↔ ELAN correlation</div>
+  <div id="giladiSection">
+    <div id="giladiNoCSV" class="no-csv-msg" style="display:none">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+      <div>Load CSV Trial Sheets to see Giladi ↔ ELAN correlation analysis.<br><span style="font-size:0.68rem;color:var(--muted2)">P-XXX_TrialRunSheet_*.csv files are matched by subject ID.</span></div>
+    </div>
+    <div id="giladiCharts" style="display:none">
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-card-title" id="titleCorrTotal">Giladi Total vs % Frozen <span class="r-badge" id="rCorrTotal">r = —</span></div>
+          <div class="chart-canvas-wrap"><canvas id="chartCorrTotal"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title" id="titleCorrFreq">Giladi Frequency vs Episode Count <span class="r-badge" id="rCorrFreq">r = —</span></div>
+          <div class="chart-canvas-wrap"><canvas id="chartCorrFreq"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title" id="titleCorrDur">Giladi Duration vs Avg Episode (s) <span class="r-badge" id="rCorrDur">r = —</span></div>
+          <div class="chart-canvas-wrap"><canvas id="chartCorrDur"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-title">Correlation Summary — Pearson r</div>
+          <div id="corrTableWrap" style="padding-top:0.2rem"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Existing comparison & table sections ───────────────────────── -->
   <div id="compareSection">
     <div class="section-title">OFF vs ON comparison</div>
     <div class="compare-grid" id="compareGrid"></div>
@@ -318,57 +333,105 @@
     <table id="taskTable">
       <thead>
         <tr>
-          <th>Task</th>
-          <th>State</th>
-          <th>Trial dur (s)</th>
-          <th>FOG eps</th>
-          <th>Total FOG (s)</th>
-          <th>% frozen</th>
-          <th>Avg ep (s)</th>
-          <th>Manifestations</th>
-          <th>Episodes</th>
+          <th>Task</th><th>State</th><th>Trial dur (s)</th><th>FOG eps</th>
+          <th>Total FOG (s)</th><th>% frozen</th><th>Avg ep (s)</th>
+          <th>Manifestations</th><th>Episodes</th>
         </tr>
       </thead>
       <tbody id="taskTableBody"></tbody>
     </table>
   </div>
 </div>
-<script>
-const fileMap = new Map();
 
-// ── Parse hh:mm:ss.ms to seconds ────────────────────────────────────────────
+<script>
+// ════════════════════════════════════════════════════════════
+//  DATA STORAGE
+// ════════════════════════════════════════════════════════════
+const fileMap = new Map();  // filename → parsed ELAN data
+const csvMap  = new Map();  // normId   → parsed CSV trial sheet
+
+// ════════════════════════════════════════════════════════════
+//  CHART PALETTE
+// ════════════════════════════════════════════════════════════
+const SUBJECT_COLORS = [
+  '#4fc3f7','#a5d6a7','#ffcc80','#ce93d8',
+  '#ff8a65','#80cbc4','#f48fb1','#7986cb',
+  '#fff176','#bcaaa4','#90caf9','#ffe082'
+];
+const OFF_BG  = 'rgba(239,154,154,0.65)';
+const OFF_BD  = '#ef9a9a';
+const ON_BG   = 'rgba(165,214,167,0.65)';
+const ON_BD   = '#a5d6a7';
+const MONO    = "'IBM Plex Mono', monospace";
+
+const chartInstances = {};
+function makeChart(id, config) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  chartInstances[id] = new Chart(canvas.getContext('2d'), config);
+}
+
+function baseScales(xLabel, yLabel) {
+  return {
+    x: {
+      ticks: { color: '#6b7180', font: { family: MONO, size: 9 } },
+      grid: { color: '#2a2d35' }, border: { color: '#353840' },
+      ...(xLabel ? { title: { display: true, text: xLabel, color: '#6b7180', font: { size: 9, family: MONO } } } : {})
+    },
+    y: {
+      beginAtZero: true,
+      ticks: { color: '#6b7180', font: { family: MONO, size: 9 } },
+      grid: { color: '#2a2d35' }, border: { color: '#353840' },
+      ...(yLabel ? { title: { display: true, text: yLabel, color: '#6b7180', font: { size: 9, family: MONO } } } : {})
+    }
+  };
+}
+
+function basePlugins(tooltipCb) {
+  return {
+    legend: { labels: { color: '#9aa0b0', font: { family: MONO, size: 10 }, boxWidth: 12 } },
+    tooltip: {
+      backgroundColor: '#1e2026', borderColor: '#353840', borderWidth: 1,
+      titleColor: '#e8eaf0', bodyColor: '#9aa0b0', padding: 8,
+      titleFont: { family: MONO, size: 11 }, bodyFont: { family: MONO, size: 10 },
+      ...(tooltipCb ? { callbacks: tooltipCb } : {})
+    }
+  };
+}
+
+// ════════════════════════════════════════════════════════════
+//  TIME HELPERS
+// ════════════════════════════════════════════════════════════
 function parseTime(str) {
   if (!str) return null;
   const m = str.trim().match(/^(\d+):(\d+):(\d+)\.(\d+)$/);
   if (!m) return null;
   return +m[1]*3600 + +m[2]*60 + +m[3] + +m[4]/Math.pow(10, m[4].length);
 }
-
 function fmtHMS(sec) {
   if (sec == null) return '—';
-  const h = Math.floor(sec/3600);
-  const m = Math.floor((sec%3600)/60);
-  const s = (sec % 60).toFixed(3).padStart(6,'0');
-  return h > 0 ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${s}`
-               : `${String(m).padStart(2,'0')}:${s}`;
+  const h = Math.floor(sec/3600), mn = Math.floor((sec%3600)/60);
+  const s = (sec%60).toFixed(3).padStart(6,'0');
+  return h > 0 ? `${String(h).padStart(2,'0')}:${String(mn).padStart(2,'0')}:${s}`
+               : `${String(mn).padStart(2,'0')}:${s}`;
 }
+function fmt(n, dec=2) { return n == null ? '—' : (+n).toFixed(dec); }
 
-// ── Extract metadata from filename (BIDS-ish) ────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  FILENAME PARSER (ELAN)
+// ════════════════════════════════════════════════════════════
 function parseName(filename) {
   const base = filename.replace(/\.[^.]+$/, '');
   const parts = base.toLowerCase().split('_');
-  // subject: subXXX
   const subPart = parts.find(p => /^sub\d+$/.test(p));
-  const subId = subPart ? subPart : 'unknown';
-  // session
+  const subId = subPart || 'unknown';
   const sesPart = parts.find(p => /^ses\d+$/.test(p));
   const session = sesPart || null;
-  // state
   const stateIdx = parts.findIndex(p => p === 'off' || p === 'on');
   const state = stateIdx >= 0 ? parts[stateIdx].toUpperCase() : 'UNKNOWN';
-  // task = parts after state, stopping at camera keywords
   const camKeywords = ['front','sag','sagittal','rear','side','lateral'];
-  let taskParts = [];
+  const taskParts = [];
   for (let i = stateIdx+1; i < parts.length; i++) {
     if (camKeywords.includes(parts[i]) || parts[i] === 'blur') break;
     taskParts.push(parts[i]);
@@ -377,7 +440,9 @@ function parseName(filename) {
   return { subId, session, state, task, fullName: base };
 }
 
-// ── Parse ELAN tab-delimited export ─────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  ELAN PARSER
+// ════════════════════════════════════════════════════════════
 function parseElan(text, filename) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return null;
@@ -390,65 +455,112 @@ function parseElan(text, filename) {
   const cFest     = col('Festination');
   const cBeginSec = col('Begin Time - hh');
   const cEndSec   = col('End Time - hh');
-
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
     const cells = lines[i].split('\t');
     if (cells.length < 4) continue;
     rows.push({
-      begin: parseTime(cells[cBeginSec]),
-      end:   parseTime(cells[cEndSec]),
-      dur:   parseTime(cells[cDurSec]),
-      task:  (cells[cTask]  || '').trim(),
-      fog:   (cells[cFOG]   || '').trim(),
-      manif: (cells[cManif] || '').trim(),
-      fest:  (cells[cFest]  || '').trim(),
+      begin: parseTime(cells[cBeginSec]), end: parseTime(cells[cEndSec]),
+      dur: parseTime(cells[cDurSec]),
+      task:  (cells[cTask]  || '').trim(), fog:   (cells[cFOG]   || '').trim(),
+      manif: (cells[cManif] || '').trim(), fest:  (cells[cFest]  || '').trim(),
     });
   }
-
   const traj = rows.find(r => r.task.toLowerCase() === 'trajectory');
   const trialDuration = traj ? traj.dur : null;
-
   const fogRows = rows.filter(r => r.fog !== '');
-  const totalFog = fogRows.reduce((s, r) => s + (r.dur || 0), 0);
-
+  const totalFog = fogRows.reduce((s,r) => s + (r.dur||0), 0);
   const manifCounts = {};
   rows.forEach(r => {
     const types = [];
     if (r.manif) types.push(r.manif);
     if (r.fest)  types.push(r.fest + ' (festination)');
-    types.forEach(t => { manifCounts[t] = (manifCounts[t]||0) + 1; });
+    types.forEach(t => { manifCounts[t] = (manifCounts[t]||0)+1; });
   });
-
-  // Episode objects with full timing detail
-  const episodes = fogRows.map((r, i) => ({
-    index: i + 1,
-    begin: r.begin,
-    end:   r.end,
-    dur:   r.dur,
-    manif: r.manif,
-    fest:  r.fest,
+  const episodes = fogRows.map((r,i) => ({
+    index: i+1, begin: r.begin, end: r.end, dur: r.dur, manif: r.manif, fest: r.fest,
   }));
-
   const meta = parseName(filename);
   return {
-    ...meta,
-    filename,
-    trialDuration,
-    fogEpisodes: fogRows.length,
-    totalFog,
-    pctFrozen: trialDuration ? (totalFog / trialDuration) * 100 : null,
-    avgEpisode: fogRows.length ? totalFog / fogRows.length : 0,
-    manifCounts,
-    episodes,
-    fogRows,
-    rows,
+    ...meta, filename, trialDuration, fogEpisodes: fogRows.length, totalFog,
+    pctFrozen: trialDuration ? (totalFog/trialDuration)*100 : null,
+    avgEpisode: fogRows.length ? totalFog/fogRows.length : 0,
+    manifCounts, episodes, fogRows, rows,
   };
 }
 
-// ── File handling ────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  CSV TRIAL SHEET PARSER
+// ════════════════════════════════════════════════════════════
+function parseCsvSheet(text, filename) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return null;
+  const header = lines[0].split('\t').map(h => h.trim());
+  // Must be Field/Value two-column format
+  if (header[0].toLowerCase() !== 'field') return null;
+  const data = {};
+  for (let i = 1; i < lines.length; i++) {
+    const parts = lines[i].split('\t');
+    if (parts.length >= 2) {
+      const key = parts[0].trim();
+      const val = parts.slice(1).join('\t').trim();
+      data[key] = val;
+    }
+  }
+  const participantId = data['Participant ID'];
+  if (!participantId) return null;
+  const normId = normalizeSubId(participantId);
+  if (!normId) return null;
+  return { participantId, normId, data, filename };
+}
+
+// Normalize subject IDs: "P-001", "sub001", "001" → "001"
+function normalizeSubId(id) {
+  const m = (id || '').match(/(\d+)/);
+  return m ? String(parseInt(m[1])).padStart(3, '0') : null;
+}
+
+// Pretty-print subject IDs
+function subLabel(subId) {
+  const norm = normalizeSubId(subId);
+  return norm ? `P-${norm}` : subId.toUpperCase();
+}
+
+// Pretty-print task names
+function prettyTask(task) {
+  return task.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+// ════════════════════════════════════════════════════════════
+//  GILADI HELPERS
+// ════════════════════════════════════════════════════════════
+// Map ELAN task string → Giladi field task name in CSV
+function elanTaskToGiladi(elanTask) {
+  const t = (elanTask||'').toLowerCase().replace(/[-\s]/g,'_');
+  if (/dual.?task.*turn|turn.*dual.?task/.test(t)) return 'DualTask Turns';
+  if (/dual.?task/.test(t))                        return 'DualTask Walk';
+  if (/turn/.test(t))                              return 'Turns';
+  if (/walk/.test(t))                              return 'Walk';
+  if (/carr/.test(t))                              return 'Carrying';
+  if (/shuffle/.test(t))                           return 'Box Shuffle';
+  if (/agilit/.test(t))                            return 'Box Agility';
+  if (/door/.test(t))                              return 'Doorway';
+  return null;
+}
+
+function getGiladiScore(csvData, state, giladiTask, metric) {
+  const key = `Giladi ${state} ${giladiTask} ${metric}`;
+  const val = (csvData[key]||'').trim();
+  if (!val) return null;
+  const n = parseFloat(val);
+  return isNaN(n) ? null : n;
+}
+
+// ════════════════════════════════════════════════════════════
+//  FILE HANDLING
+// ════════════════════════════════════════════════════════════
 function loadFile(file) {
-  return new Promise((res, rej) => {
+  return new Promise((res,rej) => {
     const reader = new FileReader();
     reader.onload = e => res({ name: file.name, text: e.target.result });
     reader.onerror = () => rej(file.name);
@@ -459,13 +571,23 @@ function loadFile(file) {
 async function addFiles(files) {
   clearErrors();
   for (const file of files) {
-    if (fileMap.has(file.name)) continue;
-    try {
-      const { text } = await loadFile(file);
-      const data = parseElan(text, file.name);
-      if (!data) { showError(`Could not parse: ${file.name}`); continue; }
-      fileMap.set(file.name, data);
-    } catch { showError(`Error reading: ${file.name}`); }
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'csv') {
+      try {
+        const { text } = await loadFile(file);
+        const data = parseCsvSheet(text, file.name);
+        if (!data) { showError(`Could not parse CSV trial sheet: ${file.name}`); continue; }
+        csvMap.set(data.normId, data);
+      } catch { showError(`Error reading: ${file.name}`); }
+    } else {
+      if (fileMap.has(file.name)) continue;
+      try {
+        const { text } = await loadFile(file);
+        const data = parseElan(text, file.name);
+        if (!data) { showError(`Could not parse ELAN file: ${file.name}`); continue; }
+        fileMap.set(file.name, data);
+      } catch { showError(`Error reading: ${file.name}`); }
+    }
   }
   renderChips();
   document.getElementById('analyzeBtn').disabled = fileMap.size === 0;
@@ -477,24 +599,31 @@ function renderChips() {
   for (const [name, d] of fileMap) {
     const chip = document.createElement('div');
     chip.className = 'file-chip';
-    const dotColor = d.state === 'OFF' ? 'var(--off-color)' : d.state === 'ON' ? 'var(--on-color)' : 'var(--muted)';
-    chip.innerHTML = `<span class="state-dot" style="background:${dotColor}"></span>${d.subId} · ${d.task || name}<span class="remove" data-name="${name}" title="Remove">×</span>`;
+    const dotColor = d.state==='OFF' ? 'var(--off-color)' : d.state==='ON' ? 'var(--on-color)' : 'var(--muted)';
+    chip.innerHTML = `<span class="state-dot" style="background:${dotColor}"></span>${subLabel(d.subId)} · ${d.task||name}<span class="remove" data-name="${name}" title="Remove">×</span>`;
     chip.querySelector('.remove').addEventListener('click', e => {
-      fileMap.delete(e.target.dataset.name);
-      renderChips();
+      fileMap.delete(e.target.dataset.name); renderChips();
       document.getElementById('analyzeBtn').disabled = fileMap.size === 0;
+    });
+    wrap.appendChild(chip);
+  }
+  for (const [normId, d] of csvMap) {
+    const chip = document.createElement('div');
+    chip.className = 'file-chip csv-chip';
+    chip.innerHTML = `<span class="state-dot" style="background:var(--subject-accent)"></span>CSV · ${d.participantId}<span class="remove" data-normid="${normId}" data-type="csv" title="Remove">×</span>`;
+    chip.querySelector('.remove').addEventListener('click', e => {
+      csvMap.delete(e.target.dataset.normid); renderChips();
     });
     wrap.appendChild(chip);
   }
 }
 
 function clearAll() {
-  fileMap.clear(); renderChips(); clearErrors();
+  fileMap.clear(); csvMap.clear(); renderChips(); clearErrors();
   document.getElementById('results').style.display = 'none';
   document.getElementById('analyzeBtn').disabled = true;
   document.getElementById('fileInput').value = '';
 }
-
 function showError(msg) {
   const box = document.getElementById('errorBox');
   const d = document.createElement('div'); d.className = 'error-msg'; d.textContent = '⚠ ' + msg;
@@ -502,38 +631,43 @@ function showError(msg) {
 }
 function clearErrors() { document.getElementById('errorBox').innerHTML = ''; }
 
-// ── Drag & drop ──────────────────────────────────────────────────────────────
+// Drag & drop
 const dz = document.getElementById('dropZone');
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
 dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
 dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); addFiles(e.dataTransfer.files); });
 document.getElementById('fileInput').addEventListener('change', e => addFiles(e.target.files));
 
-// ── Analysis ─────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  ANALYSIS ENTRY POINT
+// ════════════════════════════════════════════════════════════
 function runAnalysis() {
   const all = [...fileMap.values()];
   if (!all.length) return;
   document.getElementById('results').style.display = 'block';
   renderSummary(all);
   renderManifBars(all);
+  renderCharts(all);
+  renderGiladiCorrelation(all);
   renderCompare(all);
   renderSubjectCompare(all);
   renderTaskTable(all);
 }
 
-function fmt(n, dec=2) { return n == null ? '—' : (+n).toFixed(dec); }
-
+// ════════════════════════════════════════════════════════════
+//  SUMMARY
+// ════════════════════════════════════════════════════════════
 function renderSummary(all) {
-  const totalEpisodes = all.reduce((s,d) => s + d.fogEpisodes, 0);
-  const totalFogSec   = all.reduce((s,d) => s + d.totalFog, 0);
-  const totalTrialSec = all.reduce((s,d) => s + (d.trialDuration||0), 0);
+  const totalEpisodes = all.reduce((s,d) => s+d.fogEpisodes, 0);
+  const totalFogSec   = all.reduce((s,d) => s+d.totalFog, 0);
+  const totalTrialSec = all.reduce((s,d) => s+(d.trialDuration||0), 0);
   const pct = totalTrialSec ? (totalFogSec/totalTrialSec)*100 : null;
   const avgEp = totalEpisodes ? totalFogSec/totalEpisodes : 0;
   const subjects = new Set(all.map(d => d.subId)).size;
-  const g = document.getElementById('summaryGrid');
-  g.innerHTML = `
-    <div class="stat-card"><div class="label">Subjects</div><div class="value" style="color:var(--subject-accent)">${subjects}</div><div class="sub">${all.length} trials total</div></div>
-    <div class="stat-card"><div class="label">Files loaded</div><div class="value" style="color:var(--accent)">${all.length}</div><div class="sub">trials</div></div>
+  const csvCount = csvMap.size;
+  document.getElementById('summaryGrid').innerHTML = `
+    <div class="stat-card"><div class="label">Subjects</div><div class="value" style="color:var(--subject-accent)">${subjects}</div><div class="sub">${all.length} ELAN trials · ${csvCount} trial sheets</div></div>
+    <div class="stat-card"><div class="label">ELAN files</div><div class="value" style="color:var(--accent)">${all.length}</div><div class="sub">trials loaded</div></div>
     <div class="stat-card"><div class="label">FOG episodes</div><div class="value" style="color:var(--fog-color)">${totalEpisodes}</div><div class="sub">total across all trials</div></div>
     <div class="stat-card"><div class="label">Total FOG time</div><div class="value" style="color:var(--fog-color)">${fmt(totalFogSec,1)}<span style="font-size:1rem;font-weight:400"> s</span></div><div class="sub">${fmt(totalFogSec/60,1)} min</div></div>
     <div class="stat-card"><div class="label">% time frozen</div><div class="value" style="color:${pct>20?'var(--off-color)':'var(--text)'}">${pct!=null?fmt(pct,1)+'%':'—'}</div><div class="sub">of total trial time</div></div>
@@ -541,6 +675,9 @@ function renderSummary(all) {
   `;
 }
 
+// ════════════════════════════════════════════════════════════
+//  MANIFESTATION BARS
+// ════════════════════════════════════════════════════════════
 function renderManifBars(all) {
   const counts = {};
   all.forEach(d => Object.entries(d.manifCounts).forEach(([k,v]) => { counts[k]=(counts[k]||0)+v; }));
@@ -562,22 +699,341 @@ function renderManifBars(all) {
     </div>`).join('');
 }
 
+// ════════════════════════════════════════════════════════════
+//  CHART RENDERING
+// ════════════════════════════════════════════════════════════
+function renderCharts(all) {
+  renderChartPctFrozen(all);
+  renderChartEpisodeCount(all);
+  renderChartAvgDuration(all);
+  renderChartManif(all);
+  renderChartByTask(all);
+}
+
+function getSubjectGrouped(all, valueFn) {
+  const subjects = [...new Set(all.map(d=>d.subId))].sort();
+  const offVals = subjects.map(s => {
+    const d = all.filter(x=>x.subId===s&&x.state==='OFF');
+    return d.length ? valueFn(d) : null;
+  });
+  const onVals = subjects.map(s => {
+    const d = all.filter(x=>x.subId===s&&x.state==='ON');
+    return d.length ? valueFn(d) : null;
+  });
+  return { labels: subjects.map(subLabel), offVals, onVals };
+}
+
+function makeGroupedBar(id, labels, offVals, onVals, yLabel, fmtTip) {
+  makeChart(id, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label:'OFF', data:offVals, backgroundColor:OFF_BG, borderColor:OFF_BD, borderWidth:1, borderRadius:3 },
+        { label:'ON',  data:onVals,  backgroundColor:ON_BG,  borderColor:ON_BD,  borderWidth:1, borderRadius:3 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: basePlugins({ label: ctx => ctx.parsed.y==null ? null : `${ctx.dataset.label}: ${fmtTip ? fmtTip(ctx.parsed.y) : ctx.parsed.y.toFixed(2)}` }),
+      scales: baseScales(null, yLabel)
+    }
+  });
+}
+
+function renderChartPctFrozen(all) {
+  const { labels, offVals, onVals } = getSubjectGrouped(all, d => {
+    const fog = d.reduce((s,x)=>s+x.totalFog,0);
+    const tri = d.reduce((s,x)=>s+(x.trialDuration||0),0);
+    return tri ? fog/tri*100 : null;
+  });
+  makeGroupedBar('chartPctFrozen', labels, offVals, onVals, '% Frozen', v => v.toFixed(1)+'%');
+}
+
+function renderChartEpisodeCount(all) {
+  const { labels, offVals, onVals } = getSubjectGrouped(all, d => d.reduce((s,x)=>s+x.fogEpisodes,0));
+  makeGroupedBar('chartEpisodeCount', labels, offVals, onVals, 'Episodes', v => v.toFixed(0)+' ep');
+}
+
+function renderChartAvgDuration(all) {
+  const { labels, offVals, onVals } = getSubjectGrouped(all, d => {
+    const eps = d.filter(x=>x.fogEpisodes>0);
+    if (!eps.length) return null;
+    const totalFog = eps.reduce((s,x)=>s+x.totalFog,0);
+    const totalEp  = eps.reduce((s,x)=>s+x.fogEpisodes,0);
+    return totalEp ? totalFog/totalEp : null;
+  });
+  makeGroupedBar('chartAvgDuration', labels, offVals, onVals, 'Avg Duration (s)', v => v.toFixed(2)+'s');
+}
+
+function renderChartManif(all) {
+  const counts = {};
+  all.forEach(d => Object.entries(d.manifCounts).forEach(([k,v]) => { counts[k]=(counts[k]||0)+v; }));
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  if (!sorted.length) return;
+  const colMap = k => {
+    if (k.includes('Akinetic'))    return 'rgba(206,147,216,0.75)';
+    if (k.toLowerCase().includes('trembling') && !k.toLowerCase().includes('no_')) return 'rgba(255,138,101,0.75)';
+    if (k.toLowerCase().includes('no_trembling')) return 'rgba(128,203,196,0.75)';
+    return 'rgba(244,143,177,0.75)';
+  };
+  makeChart('chartManif', {
+    type: 'doughnut',
+    data: {
+      labels: sorted.map(([k])=>k),
+      datasets: [{
+        data: sorted.map(([,v])=>v),
+        backgroundColor: sorted.map(([k])=>colMap(k)),
+        borderColor: '#1e2026', borderWidth: 2
+      }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      cutout: '60%',
+      plugins: {
+        legend: { position:'right', labels: { color:'#9aa0b0', font:{family:MONO,size:9}, boxWidth:12, padding:10 } },
+        tooltip: {
+          backgroundColor:'#1e2026', borderColor:'#353840', borderWidth:1,
+          titleColor:'#e8eaf0', bodyColor:'#9aa0b0',
+          titleFont:{family:MONO,size:11}, bodyFont:{family:MONO,size:10},
+          callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} (${(ctx.parsed/sorted.reduce((s,[,v])=>s+v,0)*100).toFixed(1)}%)` }
+        }
+      }
+    }
+  });
+}
+
+function renderChartByTask(all) {
+  // Aggregate by normalized task name
+  const taskSet = {};
+  all.forEach(d => {
+    const task = d.task || 'unknown';
+    if (!taskSet[task]) taskSet[task] = { off:[], on:[] };
+    if (d.state==='OFF') taskSet[task].off.push(d);
+    else if (d.state==='ON') taskSet[task].on.push(d);
+  });
+  const tasks = Object.keys(taskSet).sort();
+  const pctFn = arr => {
+    if (!arr.length) return null;
+    const fog = arr.reduce((s,x)=>s+x.totalFog,0);
+    const tri = arr.reduce((s,x)=>s+(x.trialDuration||0),0);
+    return tri ? fog/tri*100 : null;
+  };
+  const offVals = tasks.map(t => pctFn(taskSet[t].off));
+  const onVals  = tasks.map(t => pctFn(taskSet[t].on));
+  makeChart('chartByTask', {
+    type: 'bar',
+    data: {
+      labels: tasks.map(prettyTask),
+      datasets: [
+        { label:'OFF', data:offVals, backgroundColor:OFF_BG, borderColor:OFF_BD, borderWidth:1, borderRadius:3 },
+        { label:'ON',  data:onVals,  backgroundColor:ON_BG,  borderColor:ON_BD,  borderWidth:1, borderRadius:3 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: basePlugins({ label: ctx => ctx.parsed.y==null ? null : `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%` }),
+      scales: baseScales(null, '% Frozen')
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+//  GILADI CORRELATION
+// ════════════════════════════════════════════════════════════
+function pearsonR(pts) {
+  const n = pts.length;
+  if (n < 3) return null;
+  const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+  const mx = xs.reduce((a,b)=>a+b)/n, my = ys.reduce((a,b)=>a+b)/n;
+  const num = xs.reduce((s,x,i)=>s+(x-mx)*(ys[i]-my), 0);
+  const den = Math.sqrt(xs.reduce((s,x)=>s+(x-mx)**2, 0) * ys.reduce((s,y)=>s+(y-my)**2, 0));
+  return den===0 ? null : num/den;
+}
+
+function linReg(pts) {
+  const n = pts.length;
+  if (n < 2) return null;
+  const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+  const mx = xs.reduce((a,b)=>a+b)/n, my = ys.reduce((a,b)=>a+b)/n;
+  const num = xs.reduce((s,x,i)=>s+(x-mx)*(ys[i]-my), 0);
+  const den = xs.reduce((s,x)=>s+(x-mx)**2, 0);
+  if (den===0) return null;
+  const slope = num/den;
+  return { slope, intercept: my - slope*mx };
+}
+
+function buildCorrPoints(all) {
+  const total=[], freq=[], dur=[];
+  all.forEach(trial => {
+    const normId = normalizeSubId(trial.subId);
+    if (!normId) return;
+    const csvEntry = csvMap.get(normId);
+    if (!csvEntry) return;
+    const giladiTask = elanTaskToGiladi(trial.task);
+    if (!giladiTask) return;
+    const { state } = trial;
+    if (state!=='OFF' && state!=='ON') return;
+    const gTotal = getGiladiScore(csvEntry.data, state, giladiTask, 'Total');
+    const gFreq  = getGiladiScore(csvEntry.data, state, giladiTask, 'Freq');
+    const gDur   = getGiladiScore(csvEntry.data, state, giladiTask, 'Dur');
+    const lbl = `${subLabel(trial.subId)} · ${state} · ${prettyTask(trial.task)}`;
+    if (gTotal!=null && trial.pctFrozen!=null) total.push({ x:gTotal, y:trial.pctFrozen, subId:trial.subId, state, label:lbl });
+    if (gFreq!=null)                           freq.push({  x:gFreq,  y:trial.fogEpisodes, subId:trial.subId, state, label:lbl });
+    if (gDur!=null && trial.fogEpisodes>0)     dur.push({   x:gDur,   y:trial.avgEpisode, subId:trial.subId, state, label:lbl });
+  });
+  return { total, freq, dur };
+}
+
+function scatterDatasets(pts, subjectColorMap) {
+  const bySub = {};
+  pts.forEach(p => { if (!bySub[p.subId]) bySub[p.subId]=[]; bySub[p.subId].push(p); });
+  return Object.entries(bySub).map(([subId, sPts]) => ({
+    label: subLabel(subId),
+    data: sPts.map(p => ({ x:p.x, y:p.y, label:p.label, state:p.state })),
+    backgroundColor: (subjectColorMap[subId]||'#4fc3f7')+'bb',
+    borderColor: subjectColorMap[subId]||'#4fc3f7',
+    pointRadius: 6, pointHoverRadius: 9, pointBorderWidth: 1.5,
+  }));
+}
+
+function regressionDataset(pts) {
+  if (pts.length < 2) return null;
+  const reg = linReg(pts);
+  if (!reg) return null;
+  const xs = pts.map(p=>p.x);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  return {
+    type: 'line', label: 'trend',
+    data: [{ x:minX, y:reg.slope*minX+reg.intercept }, { x:maxX, y:reg.slope*maxX+reg.intercept }],
+    borderColor: 'rgba(255,255,255,0.25)', borderWidth: 1.5,
+    borderDash: [4,4], pointRadius: 0, fill: false,
+  };
+}
+
+function rClass(r) {
+  if (r===null) return { cls:'r-weak', label:'n/a' };
+  const abs = Math.abs(r);
+  if (abs >= 0.7) return { cls: r>=0 ? 'r-strong-pos' : 'r-neg', label: r>=0 ? 'strong +' : 'strong −' };
+  if (abs >= 0.4) return { cls: r>=0 ? 'r-moderate-pos' : 'r-neg', label: r>=0 ? 'moderate +' : 'moderate −' };
+  return { cls:'r-weak', label:'weak' };
+}
+
+function makeCorrScatter(id, pts, subjectColorMap, xLabel, yLabel, rBadgeId) {
+  const r = pearsonR(pts);
+  const rInfo = rClass(r);
+  if (rBadgeId) {
+    const badge = document.getElementById(rBadgeId);
+    if (badge) {
+      badge.textContent = r!=null ? `r = ${r.toFixed(3)}` : 'r = —';
+      badge.className = `r-badge ${rInfo.cls}`;
+    }
+  }
+  const datasets = scatterDatasets(pts, subjectColorMap);
+  const regDs = regressionDataset(pts);
+  if (regDs) datasets.push(regDs);
+  makeChart(id, {
+    type: 'scatter',
+    data: { datasets },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: {
+        legend: { labels: { color:'#9aa0b0', font:{family:MONO,size:9}, boxWidth:10,
+          filter: item => item.text !== 'trend' } },
+        tooltip: {
+          backgroundColor:'#1e2026', borderColor:'#353840', borderWidth:1,
+          titleColor:'#e8eaf0', bodyColor:'#9aa0b0',
+          titleFont:{family:MONO,size:10}, bodyFont:{family:MONO,size:9},
+          callbacks: {
+            title: () => '',
+            label: ctx => ctx.raw.label
+              ? [ctx.raw.label, `Giladi: ${ctx.raw.x}  ELAN: ${(+ctx.raw.y).toFixed(2)}`]
+              : `(${ctx.parsed.x}, ${ctx.parsed.y.toFixed(2)})`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks:{color:'#6b7180',font:{family:MONO,size:9}}, grid:{color:'#2a2d35'}, border:{color:'#353840'},
+          title:{display:true,text:xLabel,color:'#6b7180',font:{size:9,family:MONO}}
+        },
+        y: {
+          ticks:{color:'#6b7180',font:{family:MONO,size:9}}, grid:{color:'#2a2d35'}, border:{color:'#353840'},
+          title:{display:true,text:yLabel,color:'#6b7180',font:{size:9,family:MONO}}
+        }
+      }
+    }
+  });
+  return r;
+}
+
+function renderGiladiCorrelation(all) {
+  const noCSV = document.getElementById('giladiNoCSV');
+  const giladiCharts = document.getElementById('giladiCharts');
+  if (csvMap.size === 0) {
+    noCSV.style.display = 'flex';
+    giladiCharts.style.display = 'none';
+    return;
+  }
+  noCSV.style.display = 'none';
+  giladiCharts.style.display = 'block';
+
+  const { total, freq, dur } = buildCorrPoints(all);
+  // Subject color map
+  const subjects = [...new Set(all.map(d=>d.subId))].sort();
+  const subjectColorMap = {};
+  subjects.forEach((s,i) => { subjectColorMap[s] = SUBJECT_COLORS[i % SUBJECT_COLORS.length]; });
+
+  const rTotal = makeCorrScatter('chartCorrTotal', total, subjectColorMap, 'Giladi Total Score', '% Time Frozen', 'rCorrTotal');
+  const rFreq  = makeCorrScatter('chartCorrFreq',  freq,  subjectColorMap, 'Giladi Frequency Score', 'FOG Episode Count', 'rCorrFreq');
+  const rDur   = makeCorrScatter('chartCorrDur',   dur,   subjectColorMap, 'Giladi Duration Score', 'Avg Episode Duration (s)', 'rCorrDur');
+
+  // Correlation summary table
+  const rows = [
+    { label:'Giladi Total vs % Frozen',      r:rTotal, n:total.length, desc:'Overall severity' },
+    { label:'Giladi Freq vs Episode Count',  r:rFreq,  n:freq.length,  desc:'Frequency match' },
+    { label:'Giladi Dur vs Avg Ep. Duration',r:rDur,   n:dur.length,   desc:'Duration match'  },
+  ];
+  const tableHtml = `<table class="corr-table">
+    <thead><tr><th>Comparison</th><th>n</th><th>r</th><th>Strength</th><th>Context</th></tr></thead>
+    <tbody>${rows.map(row => {
+      const ri = rClass(row.r);
+      const barW = row.r!=null ? Math.abs(row.r)*60 : 0;
+      const barColor = row.r==null ? '#2a2d35' : row.r>=0 ? '#a5d6a7' : '#ef9a9a';
+      return `<tr>
+        <td style="color:var(--text)">${row.label}</td>
+        <td class="n-label">${row.n}</td>
+        <td><span class="r-val ${ri.cls}">${row.r!=null ? row.r.toFixed(3) : '—'}</span>
+          <span class="interp-bar" style="width:${barW}px;background:${barColor}"></span></td>
+        <td><span class="${ri.cls}" style="font-size:0.7rem">${ri.label}</span></td>
+        <td style="color:var(--muted);font-size:0.68rem">${row.desc}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+
+  // Add note if few matches
+  const minN = Math.min(total.length, freq.length, dur.length);
+  const noteHtml = minN < 5 ? `<div style="margin-top:0.8rem;font-size:0.68rem;color:var(--muted2);font-family:${MONO}">⚠ Low n (${minN} matched pairs). Load more paired files for reliable correlations.</div>` : '';
+  document.getElementById('corrTableWrap').innerHTML = tableHtml + noteHtml;
+}
+
+// ════════════════════════════════════════════════════════════
+//  OFF vs ON COMPARISON
+// ════════════════════════════════════════════════════════════
 function renderCompare(all) {
   const section = document.getElementById('compareSection');
-  const offData = all.filter(d => d.state === 'OFF');
-  const onData  = all.filter(d => d.state === 'ON');
-  if (!offData.length || !onData.length) { section.style.display = 'none'; return; }
-  section.style.display = 'block';
+  const offData = all.filter(d=>d.state==='OFF');
+  const onData  = all.filter(d=>d.state==='ON');
+  if (!offData.length || !onData.length) { section.style.display='none'; return; }
+  section.style.display='block';
   function aggStats(arr) {
     const eps = arr.reduce((s,d)=>s+d.fogEpisodes,0);
     const fog = arr.reduce((s,d)=>s+d.totalFog,0);
     const tri = arr.reduce((s,d)=>s+(d.trialDuration||0),0);
-    return { eps, fog, tri, pct: tri?(fog/tri*100):null, avg: eps?fog/eps:0 };
+    return { eps, fog, tri, pct:tri?(fog/tri*100):null, avg:eps?fog/eps:0 };
   }
-  const off = aggStats(offData), on = aggStats(onData);
-  function card(label, cls, data, n) {
-    return `<div class="compare-card ${cls}">
-      <h3>${label} STATE · ${n} trials</h3>
+  function card(label,cls,data,n) {
+    return `<div class="compare-card ${cls}"><h3>${label} STATE · ${n} trials</h3>
       <div class="compare-stat"><span class="cs-label">FOG episodes</span><span class="cs-val">${data.eps}</span></div>
       <div class="compare-stat"><span class="cs-label">Total FOG time</span><span class="cs-val">${fmt(data.fog,2)} s</span></div>
       <div class="compare-stat"><span class="cs-label">% time frozen</span><span class="cs-val">${data.pct!=null?fmt(data.pct,1)+'%':'—'}</span></div>
@@ -585,99 +1041,85 @@ function renderCompare(all) {
     </div>`;
   }
   document.getElementById('compareGrid').innerHTML =
-    card('OFF','off-card',off,offData.length) + card('ON','on-card',on,onData.length);
+    card('OFF','off-card',aggStats(offData),offData.length) + card('ON','on-card',aggStats(onData),onData.length);
 }
 
 function renderSubjectCompare(all) {
   const section = document.getElementById('subjectCompareSection');
-  const subjects = [...new Set(all.map(d => d.subId))].sort();
-  // Only show if any subject has both ON and OFF
+  const subjects = [...new Set(all.map(d=>d.subId))].sort();
   const hasBoth = subjects.some(sub => {
-    const subs = all.filter(d => d.subId === sub);
+    const subs = all.filter(d=>d.subId===sub);
     return subs.some(d=>d.state==='OFF') && subs.some(d=>d.state==='ON');
   });
-  if (!hasBoth) { section.style.display = 'none'; return; }
-  section.style.display = 'block';
-
+  if (!hasBoth) { section.style.display='none'; return; }
+  section.style.display='block';
   function aggStats(arr) {
-    const eps = arr.reduce((s,d)=>s+d.fogEpisodes,0);
-    const fog = arr.reduce((s,d)=>s+d.totalFog,0);
-    const tri = arr.reduce((s,d)=>s+(d.trialDuration||0),0);
-    return { eps, fog, tri, pct: tri?(fog/tri*100):null, avg: eps?fog/eps:0 };
+    const eps=arr.reduce((s,d)=>s+d.fogEpisodes,0);
+    const fog=arr.reduce((s,d)=>s+d.totalFog,0);
+    const tri=arr.reduce((s,d)=>s+(d.trialDuration||0),0);
+    return { eps,fog,tri,pct:tri?(fog/tri*100):null,avg:eps?fog/eps:0 };
   }
-
   const wrap = document.getElementById('subjectCompareWrap');
   wrap.innerHTML = subjects.map(sub => {
-    const subData = all.filter(d => d.subId === sub);
-    const offData = subData.filter(d => d.state === 'OFF');
-    const onData  = subData.filter(d => d.state === 'ON');
+    const subData=all.filter(d=>d.subId===sub);
+    const offData=subData.filter(d=>d.state==='OFF');
+    const onData=subData.filter(d=>d.state==='ON');
     if (!offData.length && !onData.length) return '';
-
-    const rows = [
-      ['FOG episodes',   offData.length ? aggStats(offData).eps : '—',  onData.length ? aggStats(onData).eps : '—'],
-      ['Total FOG (s)',  offData.length ? fmt(aggStats(offData).fog,2) : '—', onData.length ? fmt(aggStats(onData).fog,2) : '—'],
-      ['% time frozen',  offData.length ? (aggStats(offData).pct!=null?fmt(aggStats(offData).pct,1)+'%':'—') : '—', onData.length ? (aggStats(onData).pct!=null?fmt(aggStats(onData).pct,1)+'%':'—') : '—'],
-      ['Avg episode (s)', offData.length ? fmt(aggStats(offData).avg,2) : '—', onData.length ? fmt(aggStats(onData).avg,2) : '—'],
+    const rows=[
+      ['FOG episodes',    offData.length?aggStats(offData).eps:'—',  onData.length?aggStats(onData).eps:'—'],
+      ['Total FOG (s)',   offData.length?fmt(aggStats(offData).fog,2):'—', onData.length?fmt(aggStats(onData).fog,2):'—'],
+      ['% time frozen',   offData.length?(aggStats(offData).pct!=null?fmt(aggStats(offData).pct,1)+'%':'—'):'—', onData.length?(aggStats(onData).pct!=null?fmt(aggStats(onData).pct,1)+'%':'—'):'—'],
+      ['Avg episode (s)', offData.length?fmt(aggStats(offData).avg,2):'—', onData.length?fmt(aggStats(onData).avg,2):'—'],
     ];
-
     return `<div class="subject-compare-block">
-      <h3>◈ ${sub.toUpperCase()} · ${subData.length} trials</h3>
+      <h3>◈ ${subLabel(sub)} · ${subData.length} trials</h3>
       <div class="compare-grid" style="margin-bottom:0">
-        ${offData.length ? `<div class="compare-card off-card"><h3>OFF · ${offData.length} trials</h3>
-          ${rows.map(r=>`<div class="compare-stat"><span class="cs-label">${r[0]}</span><span class="cs-val">${r[1]}</span></div>`).join('')}
-        </div>` : ''}
-        ${onData.length ? `<div class="compare-card on-card"><h3>ON · ${onData.length} trials</h3>
-          ${rows.map(r=>`<div class="compare-stat"><span class="cs-label">${r[0]}</span><span class="cs-val">${r[2]}</span></div>`).join('')}
-        </div>` : ''}
+        ${offData.length?`<div class="compare-card off-card"><h3>OFF · ${offData.length} trials</h3>${rows.map(r=>`<div class="compare-stat"><span class="cs-label">${r[0]}</span><span class="cs-val">${r[1]}</span></div>`).join('')}</div>`:''}
+        ${onData.length?`<div class="compare-card on-card"><h3>ON · ${onData.length} trials</h3>${rows.map(r=>`<div class="compare-stat"><span class="cs-label">${r[0]}</span><span class="cs-val">${r[2]}</span></div>`).join('')}</div>`:''}
       </div>
     </div>`;
   }).join('');
 }
 
+// ════════════════════════════════════════════════════════════
+//  MANIFESTATION PILLS
+// ════════════════════════════════════════════════════════════
 function manifPills(counts) {
   if (!Object.keys(counts).length) return '<span class="pill pill-none">none</span>';
   return Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([k,v]) => {
-    let cls = 'pill-kinetic-nt';
-    if (k.includes('Akinetic')) cls = 'pill-akinetic';
-    else if (k.toLowerCase().includes('trembling') && !k.toLowerCase().includes('no_')) cls = 'pill-kinetic-t';
-    else if (k.toLowerCase().includes('festination')) cls = 'pill-festination';
+    let cls='pill-kinetic-nt';
+    if (k.includes('Akinetic')) cls='pill-akinetic';
+    else if (k.toLowerCase().includes('trembling')&&!k.toLowerCase().includes('no_')) cls='pill-kinetic-t';
+    else if (k.toLowerCase().includes('festination')) cls='pill-festination';
     return `<span class="pill ${cls}">${k} ×${v}</span>`;
   }).join('');
 }
 
-// ── Episode detail sub-table ─────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  EPISODE DETAIL SUB-TABLE
+// ════════════════════════════════════════════════════════════
 function buildEpisodeTable(episodes) {
-  if (!episodes || !episodes.length) {
-    return `<div class="no-episodes">No FOG episodes in this trial.</div>`;
-  }
-  const maxDur = Math.max(...episodes.map(e => e.dur || 0), 0.001);
+  if (!episodes||!episodes.length) return `<div class="no-episodes">No FOG episodes in this trial.</div>`;
+  const maxDur = Math.max(...episodes.map(e=>e.dur||0), 0.001);
   const rows = episodes.map(ep => {
-    const barW = ((ep.dur || 0) / maxDur * 100).toFixed(1);
-    const manifLabel = [ep.manif, ep.fest ? ep.fest+' (fest.)' : ''].filter(Boolean).join(', ') || '—';
+    const barW = ((ep.dur||0)/maxDur*100).toFixed(1);
+    const manifLabel = [ep.manif, ep.fest?ep.fest+' (fest.)':''].filter(Boolean).join(', ')||'—';
     return `<tr>
       <td class="ep-num">#${ep.index}</td>
       <td class="ep-time">${fmtHMS(ep.begin)}</td>
       <td class="ep-time">${fmtHMS(ep.end)}</td>
-      <td class="ep-dur">
-        <span class="ep-dur-bar-bg"><span class="ep-dur-bar-fill" style="width:${barW}%"></span></span>
-        ${fmt(ep.dur, 3)} s
-      </td>
+      <td class="ep-dur"><span class="ep-dur-bar-bg"><span class="ep-dur-bar-fill" style="width:${barW}%"></span></span>${fmt(ep.dur,3)} s</td>
       <td style="color:var(--muted);font-size:0.68rem">${manifLabel}</td>
     </tr>`;
   }).join('');
-  return `<table class="episode-table">
-    <thead><tr>
-      <th>#</th><th>Begin</th><th>End</th><th>Duration (s)</th><th>Manifestation</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
+  return `<table class="episode-table"><thead><tr><th>#</th><th>Begin</th><th>End</th><th>Duration (s)</th><th>Manifestation</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 let expandCounter = 0;
 function toggleEpisodes(id) {
-  const detailRow = document.getElementById('ep-detail-' + id);
-  const btn = document.getElementById('ep-btn-' + id);
-  const taskRow = document.getElementById('ep-row-' + id);
+  const detailRow = document.getElementById('ep-detail-'+id);
+  const btn       = document.getElementById('ep-btn-'+id);
+  const taskRow   = document.getElementById('ep-row-'+id);
   if (!detailRow) return;
   const isHidden = detailRow.classList.contains('hidden');
   detailRow.classList.toggle('hidden', !isHidden);
@@ -685,80 +1127,53 @@ function toggleEpisodes(id) {
   taskRow.classList.toggle('expanded', isHidden);
 }
 
-// ── Task table: grouped by subject → state ───────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  TASK TABLE
+// ════════════════════════════════════════════════════════════
 function renderTaskTable(all) {
-  const subjects = [...new Set(all.map(d => d.subId))].sort();
-  const tbody = document.getElementById('taskTableBody');
+  const subjects = [...new Set(all.map(d=>d.subId))].sort();
   let html = '';
-
   subjects.forEach(sub => {
-    const subData = all.filter(d => d.subId === sub);
-    const states = [...new Set(subData.map(d => d.state))].sort((a,b) => a==='OFF'?-1:1);
+    const subData = all.filter(d=>d.subId===sub);
+    const states  = [...new Set(subData.map(d=>d.state))].sort((a,b)=>a==='OFF'?-1:1);
     const totalEps = subData.reduce((s,d)=>s+d.fogEpisodes,0);
     const totalFog = subData.reduce((s,d)=>s+d.totalFog,0);
-
-    // Subject header row
-    html += `<tr class="subject-row">
-      <td colspan="9">
-        ◈ ${sub.toUpperCase()}
-        <span class="sub-meta">${subData.length} trial${subData.length!==1?'s':''} · ${totalEps} ep · ${fmt(totalFog,1)} s FOG</span>
-      </td>
-    </tr>`;
-
+    html += `<tr class="subject-row"><td colspan="9">◈ ${subLabel(sub)}<span class="sub-meta">${subData.length} trial${subData.length!==1?'s':''} · ${totalEps} ep · ${fmt(totalFog,1)} s FOG</span></td></tr>`;
     states.forEach(state => {
-      const stateData = subData.filter(d => d.state === state)
-        .sort((a,b) => a.task.localeCompare(b.task));
-      const stateClass = state === 'OFF' ? 'state-off' : state === 'ON' ? 'state-on' : '';
-      const stateEps = stateData.reduce((s,d)=>s+d.fogEpisodes,0);
-      const stateFog = stateData.reduce((s,d)=>s+d.totalFog,0);
-
-      // State sub-header row
-      html += `<tr class="state-group-row ${stateClass}">
-        <td colspan="9">
-          ${state} STATE · ${stateData.length} trial${stateData.length!==1?'s':''} · ${stateEps} ep · ${fmt(stateFog,1)} s FOG
-        </td>
-      </tr>`;
-
+      const stateData = subData.filter(d=>d.state===state).sort((a,b)=>a.task.localeCompare(b.task));
+      const stateClass = state==='OFF'?'state-off':state==='ON'?'state-on':'';
+      const stateEps=stateData.reduce((s,d)=>s+d.fogEpisodes,0);
+      const stateFog=stateData.reduce((s,d)=>s+d.totalFog,0);
+      html += `<tr class="state-group-row ${stateClass}"><td colspan="9">${state} STATE · ${stateData.length} trial${stateData.length!==1?'s':''} · ${stateEps} ep · ${fmt(stateFog,1)} s FOG</td></tr>`;
       stateData.forEach(d => {
         const id = ++expandCounter;
         const badgeCls = d.state==='OFF'?'badge-off':d.state==='ON'?'badge-on':'';
-        const pct = d.pctFrozen != null ? d.pctFrozen : null;
-        const barW = pct != null ? Math.min(pct, 100).toFixed(1) : 0;
-        const epLabel = d.fogEpisodes > 0
+        const pct = d.pctFrozen!=null?d.pctFrozen:null;
+        const barW = pct!=null?Math.min(pct,100).toFixed(1):0;
+        const epLabel = d.fogEpisodes>0
           ? `<button class="expand-btn" id="ep-btn-${id}"><span class="arrow">▶</span> ${d.fogEpisodes} ep</button>`
           : `<span style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted2)">—</span>`;
-
         html += `<tr class="task-row" id="ep-row-${id}" onclick="toggleEpisodes(${id})">
-          <td class="task-name">${d.task || d.filename}</td>
+          <td class="task-name">${d.task||d.filename}</td>
           <td><span class="state-badge ${badgeCls}">${d.state}</span></td>
-          <td>${d.trialDuration != null ? fmt(d.trialDuration,2) : '—'}</td>
+          <td>${d.trialDuration!=null?fmt(d.trialDuration,2):'—'}</td>
           <td>${d.fogEpisodes}</td>
           <td>${fmt(d.totalFog,3)}</td>
-          <td class="pct-cell">
-            <div class="mini-bar-wrap">
-              <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${barW}%"></div></div>
-              ${pct!=null ? fmt(pct,1)+'%' : '—'}
-            </div>
-          </td>
-          <td>${d.fogEpisodes ? fmt(d.avgEpisode,3) : '—'}</td>
+          <td class="pct-cell"><div class="mini-bar-wrap"><div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${barW}%"></div></div>${pct!=null?fmt(pct,1)+'%':'—'}</div></td>
+          <td>${d.fogEpisodes?fmt(d.avgEpisode,3):'—'}</td>
           <td><div class="pill-list">${manifPills(d.manifCounts)}</div></td>
           <td>${epLabel}</td>
-        </tr>`;
-
-        // Episode detail row (hidden by default)
-        html += `<tr class="episode-detail-row hidden" id="ep-detail-${id}">
-          <td colspan="9">
-            <div class="episode-inner">
-              <div class="episode-table-label">Episode breakdown · ${d.task} · ${d.state}</div>
-              ${buildEpisodeTable(d.episodes)}
-            </div>
-          </td>
+        </tr>
+        <tr class="episode-detail-row hidden" id="ep-detail-${id}">
+          <td colspan="9"><div class="episode-inner">
+            <div class="episode-table-label">Episode breakdown · ${d.task} · ${d.state}</div>
+            ${buildEpisodeTable(d.episodes)}
+          </div></td>
         </tr>`;
       });
     });
   });
-
-  tbody.innerHTML = html;
+  document.getElementById('taskTableBody').innerHTML = html;
 }
 </script>
 </body>
