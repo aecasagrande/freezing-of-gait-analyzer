@@ -88,7 +88,7 @@
   .stat-card .sub { font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; }
   .section-title {
     font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; text-transform: uppercase;
-    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.8rem;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.8rem; margin-top: 2rem;
     display: flex; align-items: center; gap: 0.6rem;
   }
   .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
@@ -265,7 +265,6 @@
   <div class="section-title">FOG manifestation types</div>
   <div class="manif-bar-wrap" id="manifBars"></div>
 
-  <!-- ── Visual Analytics Charts ───────────────────────────────────── -->
   <div class="section-title">Visual analytics</div>
   <div class="charts-grid" id="chartsGrid">
     <div class="chart-card">
@@ -290,7 +289,6 @@
     </div>
   </div>
 
-  <!-- ── Giladi ↔ ELAN Correlation ─────────────────────────────────── -->
   <div class="section-title">Giladi ↔ ELAN correlation</div>
   <div id="giladiSection">
     <div id="giladiNoCSV" class="no-csv-msg" style="display:none">
@@ -300,7 +298,7 @@
     <div id="giladiCharts" style="display:none">
       <div class="charts-grid">
         <div class="chart-card">
-          <div class="chart-card-title" id="titleCorrTotal">Giladi Total vs % Frozen <span class="r-badge" id="rCorrTotal">r = —</span></div>
+          <div class="chart-card-title" id="titleCorrTotal">Giladi Total vs Total FOG (s)<span class="r-badge" id="rCorrTotal">r = —</span></div>
           <div class="chart-canvas-wrap"><canvas id="chartCorrTotal"></canvas></div>
         </div>
         <div class="chart-card">
@@ -311,7 +309,7 @@
           <div class="chart-card-title" id="titleCorrDur">Giladi Duration vs Avg Episode (s) <span class="r-badge" id="rCorrDur">r = —</span></div>
           <div class="chart-canvas-wrap"><canvas id="chartCorrDur"></canvas></div>
         </div>
-        <div class="chart-card">
+        <div class="chart-card chart-card-full">
           <div class="chart-card-title">Correlation Summary — Pearson r</div>
           <div id="corrTableWrap" style="padding-top:0.2rem"></div>
         </div>
@@ -319,7 +317,6 @@
     </div>
   </div>
 
-  <!-- ── Existing comparison & table sections ───────────────────────── -->
   <div id="compareSection">
     <div class="section-title">OFF vs ON comparison</div>
     <div class="compare-grid" id="compareGrid"></div>
@@ -495,15 +492,20 @@ function parseElan(text, filename) {
 function parseCsvSheet(text, filename) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return null;
-  const header = lines[0].split('\t').map(h => h.trim());
-  // Must be Field/Value two-column format
+  
+  // Detect if file is Tab-separated or Comma-separated
+  let delim = lines[0].includes('\t') ? '\t' : ',';
+  
+  const header = lines[0].split(delim).map(h => h.trim());
   if (header[0].toLowerCase() !== 'field') return null;
+
   const data = {};
   for (let i = 1; i < lines.length; i++) {
-    const parts = lines[i].split('\t');
+    const parts = lines[i].split(delim);
     if (parts.length >= 2) {
-      const key = parts[0].trim();
-      const val = parts.slice(1).join('\t').trim();
+      // Remove possible excel string quotes
+      const key = parts[0].trim().replace(/^"|"$/g, '');
+      const val = parts.slice(1).join(delim).trim().replace(/^"|"$/g, '');
       data[key] = val;
     }
   }
@@ -520,13 +522,11 @@ function normalizeSubId(id) {
   return m ? String(parseInt(m[1])).padStart(3, '0') : null;
 }
 
-// Pretty-print subject IDs
 function subLabel(subId) {
   const norm = normalizeSubId(subId);
   return norm ? `P-${norm}` : subId.toUpperCase();
 }
 
-// Pretty-print task names
 function prettyTask(task) {
   return task.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
@@ -534,7 +534,6 @@ function prettyTask(task) {
 // ════════════════════════════════════════════════════════════
 //  GILADI HELPERS
 // ════════════════════════════════════════════════════════════
-// Map ELAN task string → Giladi field task name in CSV
 function elanTaskToGiladi(elanTask) {
   const t = (elanTask||'').toLowerCase().replace(/[-\s]/g,'_');
   if (/dual.?task.*turn|turn.*dual.?task/.test(t)) return 'DualTask Turns';
@@ -557,10 +556,10 @@ function getGiladiScore(csvData, state, giladiTask, metric) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  FILE HANDLING
+//  FILE HANDLING & UI
 // ════════════════════════════════════════════════════════════
 function loadFile(file) {
-  return new Promise((res,rej) => {
+  return new Promise((res, rej) => {
     const reader = new FileReader();
     reader.onload = e => res({ name: file.name, text: e.target.result });
     reader.onerror = () => rej(file.name);
@@ -571,59 +570,69 @@ function loadFile(file) {
 async function addFiles(files) {
   clearErrors();
   for (const file of files) {
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (ext === 'csv') {
-      try {
-        const { text } = await loadFile(file);
-        const data = parseCsvSheet(text, file.name);
-        if (!data) { showError(`Could not parse CSV trial sheet: ${file.name}`); continue; }
-        csvMap.set(data.normId, data);
-      } catch { showError(`Error reading: ${file.name}`); }
-    } else {
-      if (fileMap.has(file.name)) continue;
-      try {
-        const { text } = await loadFile(file);
-        const data = parseElan(text, file.name);
-        if (!data) { showError(`Could not parse ELAN file: ${file.name}`); continue; }
-        fileMap.set(file.name, data);
-      } catch { showError(`Error reading: ${file.name}`); }
+    try {
+      const { text } = await loadFile(file);
+      if (file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.tsv')) {
+        const csvData = parseCsvSheet(text, file.name);
+        if (csvData) {
+          csvMap.set(csvData.normId, csvData);
+        } else {
+          showError(`Could not parse Trial Sheet format: ${file.name}`);
+        }
+      } else {
+        const elanData = parseElan(text, file.name);
+        if (elanData) {
+          fileMap.set(file.name, elanData);
+        } else {
+          showError(`Could not parse ELAN: ${file.name}`);
+        }
+      }
+    } catch { 
+      showError(`Error reading: ${file.name}`); 
     }
   }
   renderChips();
-  document.getElementById('analyzeBtn').disabled = fileMap.size === 0;
+  document.getElementById('analyzeBtn').disabled = (fileMap.size === 0 && csvMap.size === 0);
 }
 
 function renderChips() {
   const wrap = document.getElementById('fileChips');
   wrap.innerHTML = '';
+  // TXT chips
   for (const [name, d] of fileMap) {
     const chip = document.createElement('div');
     chip.className = 'file-chip';
-    const dotColor = d.state==='OFF' ? 'var(--off-color)' : d.state==='ON' ? 'var(--on-color)' : 'var(--muted)';
-    chip.innerHTML = `<span class="state-dot" style="background:${dotColor}"></span>${subLabel(d.subId)} · ${d.task||name}<span class="remove" data-name="${name}" title="Remove">×</span>`;
-    chip.querySelector('.remove').addEventListener('click', e => {
-      fileMap.delete(e.target.dataset.name); renderChips();
-      document.getElementById('analyzeBtn').disabled = fileMap.size === 0;
-    });
+    const dotColor = d.state === 'OFF' ? 'var(--off-color)' : d.state === 'ON' ? 'var(--on-color)' : 'var(--muted)';
+    chip.innerHTML = `<span class="state-dot" style="background:${dotColor}"></span>[TXT] ${subLabel(d.subId)} · ${d.task || name}<span class="remove" data-name="${name}" data-type="txt">×</span>`;
     wrap.appendChild(chip);
   }
+  // CSV chips
   for (const [normId, d] of csvMap) {
     const chip = document.createElement('div');
     chip.className = 'file-chip csv-chip';
-    chip.innerHTML = `<span class="state-dot" style="background:var(--subject-accent)"></span>CSV · ${d.participantId}<span class="remove" data-normid="${normId}" data-type="csv" title="Remove">×</span>`;
-    chip.querySelector('.remove').addEventListener('click', e => {
-      csvMap.delete(e.target.dataset.normid); renderChips();
-    });
+    chip.innerHTML = `<span class="state-dot" style="background:var(--subject-accent)"></span>[CSV] ${subLabel(normId)}<span class="remove" data-name="${normId}" data-type="csv">×</span>`;
     wrap.appendChild(chip);
   }
+
+  wrap.querySelectorAll('.remove').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const nm = e.target.dataset.name;
+      if (e.target.dataset.type === 'csv') csvMap.delete(nm);
+      else fileMap.delete(nm);
+      renderChips();
+      document.getElementById('analyzeBtn').disabled = (fileMap.size === 0 && csvMap.size === 0);
+    });
+  });
 }
 
 function clearAll() {
   fileMap.clear(); csvMap.clear(); renderChips(); clearErrors();
+  for (let key in chartInstances) { chartInstances[key].destroy(); delete chartInstances[key]; }
   document.getElementById('results').style.display = 'none';
   document.getElementById('analyzeBtn').disabled = true;
   document.getElementById('fileInput').value = '';
 }
+
 function showError(msg) {
   const box = document.getElementById('errorBox');
   const d = document.createElement('div'); d.className = 'error-msg'; d.textContent = '⚠ ' + msg;
@@ -631,7 +640,6 @@ function showError(msg) {
 }
 function clearErrors() { document.getElementById('errorBox').innerHTML = ''; }
 
-// Drag & drop
 const dz = document.getElementById('dropZone');
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
 dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
@@ -639,487 +647,380 @@ dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag
 document.getElementById('fileInput').addEventListener('change', e => addFiles(e.target.files));
 
 // ════════════════════════════════════════════════════════════
-//  ANALYSIS ENTRY POINT
+//  ANALYSIS & RENDER ORCHESTRATOR
 // ════════════════════════════════════════════════════════════
 function runAnalysis() {
-  const all = [...fileMap.values()];
-  if (!all.length) return;
+  const allElan = [...fileMap.values()];
   document.getElementById('results').style.display = 'block';
-  renderSummary(all);
-  renderManifBars(all);
-  renderCharts(all);
-  renderGiladiCorrelation(all);
-  renderCompare(all);
-  renderSubjectCompare(all);
-  renderTaskTable(all);
+  
+  if (allElan.length === 0) {
+     document.getElementById('summaryGrid').innerHTML = `<div class="stat-card"><div class="label">Status</div><div class="value">No ELAN data</div><div class="sub">Add .txt files to analyze</div></div>`;
+     return;
+  }
+
+  renderSummary(allElan);
+  renderManifBars(allElan);
+  renderCharts(allElan);
+  renderCorrelations(allElan);
+  renderCompare(allElan);
+  renderSubjectCompare(allElan);
+  renderTaskTable(allElan);
 }
 
-// ════════════════════════════════════════════════════════════
-//  SUMMARY
-// ════════════════════════════════════════════════════════════
 function renderSummary(all) {
-  const totalEpisodes = all.reduce((s,d) => s+d.fogEpisodes, 0);
-  const totalFogSec   = all.reduce((s,d) => s+d.totalFog, 0);
-  const totalTrialSec = all.reduce((s,d) => s+(d.trialDuration||0), 0);
-  const pct = totalTrialSec ? (totalFogSec/totalTrialSec)*100 : null;
-  const avgEp = totalEpisodes ? totalFogSec/totalEpisodes : 0;
-  const subjects = new Set(all.map(d => d.subId)).size;
-  const csvCount = csvMap.size;
+  const eps = all.reduce((s,d) => s + d.fogEpisodes, 0);
+  const fogSec = all.reduce((s,d) => s + d.totalFog, 0);
+  const trialSec = all.reduce((s,d) => s + (d.trialDuration||0), 0);
+  const pct = trialSec ? (fogSec/trialSec)*100 : null;
+  const avg = eps ? fogSec/eps : 0;
+  const subs = new Set(all.map(d => normalizeSubId(d.subId))).size;
+  
   document.getElementById('summaryGrid').innerHTML = `
-    <div class="stat-card"><div class="label">Subjects</div><div class="value" style="color:var(--subject-accent)">${subjects}</div><div class="sub">${all.length} ELAN trials · ${csvCount} trial sheets</div></div>
-    <div class="stat-card"><div class="label">ELAN files</div><div class="value" style="color:var(--accent)">${all.length}</div><div class="sub">trials loaded</div></div>
-    <div class="stat-card"><div class="label">FOG episodes</div><div class="value" style="color:var(--fog-color)">${totalEpisodes}</div><div class="sub">total across all trials</div></div>
-    <div class="stat-card"><div class="label">Total FOG time</div><div class="value" style="color:var(--fog-color)">${fmt(totalFogSec,1)}<span style="font-size:1rem;font-weight:400"> s</span></div><div class="sub">${fmt(totalFogSec/60,1)} min</div></div>
-    <div class="stat-card"><div class="label">% time frozen</div><div class="value" style="color:${pct>20?'var(--off-color)':'var(--text)'}">${pct!=null?fmt(pct,1)+'%':'—'}</div><div class="sub">of total trial time</div></div>
-    <div class="stat-card"><div class="label">Avg episode dur</div><div class="value">${fmt(avgEp,2)}<span style="font-size:1rem;font-weight:400"> s</span></div><div class="sub">mean across episodes</div></div>
+    <div class="stat-card"><div class="label">Subjects</div><div class="value" style="color:var(--subject-accent)">${subs}</div><div class="sub">${all.length} ELAN trials loaded</div></div>
+    <div class="stat-card"><div class="label">Total FOG eps</div><div class="value" style="color:var(--fog-color)">${eps}</div><div class="sub">across all trials</div></div>
+    <div class="stat-card"><div class="label">Total FOG time</div><div class="value" style="color:var(--fog-color)">${fmt(fogSec,1)}<span style="font-size:1rem;font-weight:400"> s</span></div><div class="sub">${fmt(fogSec/60,1)} min</div></div>
+    <div class="stat-card"><div class="label">% Time frozen</div><div class="value" style="color:${pct>20?'var(--off-color)':'var(--text)'}">${pct!=null?fmt(pct,1)+'%':'—'}</div><div class="sub">avg global</div></div>
+    <div class="stat-card"><div class="label">Avg episode</div><div class="value">${fmt(avg,2)}<span style="font-size:1rem;font-weight:400"> s</span></div><div class="sub">mean duration</div></div>
   `;
 }
 
-// ════════════════════════════════════════════════════════════
-//  MANIFESTATION BARS
-// ════════════════════════════════════════════════════════════
+function getManifColor(k) {
+  if (k.includes('Akinetic')) return '#ce93d8';
+  if (k.toLowerCase().includes('trembling') && !k.toLowerCase().includes('no_')) return '#ff8a65';
+  if (k.toLowerCase().includes('no_trembling')) return '#80cbc4';
+  return '#f48fb1';
+}
+
 function renderManifBars(all) {
   const counts = {};
   all.forEach(d => Object.entries(d.manifCounts).forEach(([k,v]) => { counts[k]=(counts[k]||0)+v; }));
   const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
   const max = sorted.length ? sorted[0][1] : 1;
-  const getColor = k => {
-    if (k.includes('Akinetic')) return 'var(--akinetic)';
-    if (k.toLowerCase().includes('trembling') && !k.toLowerCase().includes('no_')) return 'var(--kinetic-t)';
-    if (k.toLowerCase().includes('no_trembling')) return 'var(--kinetic-nt)';
-    return 'var(--festination)';
-  };
   const wrap = document.getElementById('manifBars');
   if (!sorted.length) { wrap.innerHTML = '<div class="no-data">No manifestation annotations found.</div>'; return; }
   wrap.innerHTML = sorted.map(([k,v]) => `
     <div class="manif-row">
       <div class="manif-label">${k}</div>
-      <div class="manif-bar-bg"><div class="manif-bar-fill" style="width:${(v/max*100).toFixed(1)}%;background:${getColor(k)}"></div></div>
+      <div class="manif-bar-bg"><div class="manif-bar-fill" style="width:${(v/max*100).toFixed(1)}%;background:${getManifColor(k)}"></div></div>
       <div class="manif-count">${v}×</div>
     </div>`).join('');
 }
 
-// ════════════════════════════════════════════════════════════
-//  CHART RENDERING
-// ════════════════════════════════════════════════════════════
 function renderCharts(all) {
-  renderChartPctFrozen(all);
-  renderChartEpisodeCount(all);
-  renderChartAvgDuration(all);
-  renderChartManif(all);
-  renderChartByTask(all);
-}
-
-function getSubjectGrouped(all, valueFn) {
-  const subjects = [...new Set(all.map(d=>d.subId))].sort();
-  const offVals = subjects.map(s => {
-    const d = all.filter(x=>x.subId===s&&x.state==='OFF');
-    return d.length ? valueFn(d) : null;
+  // Aggregate by normalized Subject ID
+  const subIds = [...new Set(all.map(d => normalizeSubId(d.subId)))].sort();
+  const subLabels = subIds.map(subLabel);
+  
+  // PCT Frozen by Subject
+  const pctOff = subIds.map(s => {
+    const subs = all.filter(d => normalizeSubId(d.subId)===s && d.state==='OFF');
+    const totFog = subs.reduce((sum,d)=>sum+d.totalFog,0);
+    const totDur = subs.reduce((sum,d)=>sum+(d.trialDuration||0),0);
+    return totDur ? (totFog/totDur)*100 : 0;
   });
-  const onVals = subjects.map(s => {
-    const d = all.filter(x=>x.subId===s&&x.state==='ON');
-    return d.length ? valueFn(d) : null;
+  const pctOn = subIds.map(s => {
+    const subs = all.filter(d => normalizeSubId(d.subId)===s && d.state==='ON');
+    const totFog = subs.reduce((sum,d)=>sum+d.totalFog,0);
+    const totDur = subs.reduce((sum,d)=>sum+(d.trialDuration||0),0);
+    return totDur ? (totFog/totDur)*100 : 0;
   });
-  return { labels: subjects.map(subLabel), offVals, onVals };
-}
 
-function makeGroupedBar(id, labels, offVals, onVals, yLabel, fmtTip) {
-  makeChart(id, {
+  makeChart('chartPctFrozen', {
     type: 'bar',
     data: {
-      labels,
+      labels: subLabels,
       datasets: [
-        { label:'OFF', data:offVals, backgroundColor:OFF_BG, borderColor:OFF_BD, borderWidth:1, borderRadius:3 },
-        { label:'ON',  data:onVals,  backgroundColor:ON_BG,  borderColor:ON_BD,  borderWidth:1, borderRadius:3 }
+        { label: 'OFF State', data: pctOff, backgroundColor: OFF_BG, borderColor: OFF_BD, borderWidth: 1 },
+        { label: 'ON State', data: pctOn, backgroundColor: ON_BG, borderColor: ON_BD, borderWidth: 1 }
       ]
     },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      plugins: basePlugins({ label: ctx => ctx.parsed.y==null ? null : `${ctx.dataset.label}: ${fmtTip ? fmtTip(ctx.parsed.y) : ctx.parsed.y.toFixed(2)}` }),
-      scales: baseScales(null, yLabel)
-    }
+    options: { responsive: true, maintainAspectRatio: false, scales: baseScales('', '% Frozen'), plugins: basePlugins() }
   });
-}
 
-function renderChartPctFrozen(all) {
-  const { labels, offVals, onVals } = getSubjectGrouped(all, d => {
-    const fog = d.reduce((s,x)=>s+x.totalFog,0);
-    const tri = d.reduce((s,x)=>s+(x.trialDuration||0),0);
-    return tri ? fog/tri*100 : null;
+  // Ep Count by Subject
+  const epOff = subIds.map(s => all.filter(d=>normalizeSubId(d.subId)===s && d.state==='OFF').reduce((sum,d)=>sum+d.fogEpisodes,0));
+  const epOn = subIds.map(s => all.filter(d=>normalizeSubId(d.subId)===s && d.state==='ON').reduce((sum,d)=>sum+d.fogEpisodes,0));
+
+  makeChart('chartEpisodeCount', {
+    type: 'bar',
+    data: {
+      labels: subLabels,
+      datasets: [
+        { label: 'OFF State', data: epOff, backgroundColor: OFF_BG, borderColor: OFF_BD, borderWidth: 1 },
+        { label: 'ON State', data: epOn, backgroundColor: ON_BG, borderColor: ON_BD, borderWidth: 1 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, scales: baseScales('', 'Count'), plugins: basePlugins() }
   });
-  makeGroupedBar('chartPctFrozen', labels, offVals, onVals, '% Frozen', v => v.toFixed(1)+'%');
-}
 
-function renderChartEpisodeCount(all) {
-  const { labels, offVals, onVals } = getSubjectGrouped(all, d => d.reduce((s,x)=>s+x.fogEpisodes,0));
-  makeGroupedBar('chartEpisodeCount', labels, offVals, onVals, 'Episodes', v => v.toFixed(0)+' ep');
-}
-
-function renderChartAvgDuration(all) {
-  const { labels, offVals, onVals } = getSubjectGrouped(all, d => {
-    const eps = d.filter(x=>x.fogEpisodes>0);
-    if (!eps.length) return null;
-    const totalFog = eps.reduce((s,x)=>s+x.totalFog,0);
-    const totalEp  = eps.reduce((s,x)=>s+x.fogEpisodes,0);
-    return totalEp ? totalFog/totalEp : null;
+  // Avg Duration by Subject
+  const avgOff = subIds.map(s => {
+    const eps = epOff[subIds.indexOf(s)];
+    const fog = all.filter(d=>normalizeSubId(d.subId)===s && d.state==='OFF').reduce((sum,d)=>sum+d.totalFog,0);
+    return eps ? fog/eps : 0;
   });
-  makeGroupedBar('chartAvgDuration', labels, offVals, onVals, 'Avg Duration (s)', v => v.toFixed(2)+'s');
-}
+  const avgOn = subIds.map(s => {
+    const eps = epOn[subIds.indexOf(s)];
+    const fog = all.filter(d=>normalizeSubId(d.subId)===s && d.state==='ON').reduce((sum,d)=>sum+d.totalFog,0);
+    return eps ? fog/eps : 0;
+  });
 
-function renderChartManif(all) {
+  makeChart('chartAvgDuration', {
+    type: 'bar',
+    data: {
+      labels: subLabels,
+      datasets: [
+        { label: 'OFF State', data: avgOff, backgroundColor: OFF_BG, borderColor: OFF_BD, borderWidth: 1 },
+        { label: 'ON State', data: avgOn, backgroundColor: ON_BG, borderColor: ON_BD, borderWidth: 1 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, scales: baseScales('', 'Seconds'), plugins: basePlugins() }
+  });
+
+  // Manifestation Doughnut
   const counts = {};
   all.forEach(d => Object.entries(d.manifCounts).forEach(([k,v]) => { counts[k]=(counts[k]||0)+v; }));
-  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
-  if (!sorted.length) return;
-  const colMap = k => {
-    if (k.includes('Akinetic'))    return 'rgba(206,147,216,0.75)';
-    if (k.toLowerCase().includes('trembling') && !k.toLowerCase().includes('no_')) return 'rgba(255,138,101,0.75)';
-    if (k.toLowerCase().includes('no_trembling')) return 'rgba(128,203,196,0.75)';
-    return 'rgba(244,143,177,0.75)';
-  };
+  const mLabels = Object.keys(counts);
+  const mData = Object.values(counts);
+  const mColors = mLabels.map(getManifColor);
+
   makeChart('chartManif', {
     type: 'doughnut',
-    data: {
-      labels: sorted.map(([k])=>k),
-      datasets: [{
-        data: sorted.map(([,v])=>v),
-        backgroundColor: sorted.map(([k])=>colMap(k)),
-        borderColor: '#1e2026', borderWidth: 2
-      }]
-    },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      cutout: '60%',
-      plugins: {
-        legend: { position:'right', labels: { color:'#9aa0b0', font:{family:MONO,size:9}, boxWidth:12, padding:10 } },
-        tooltip: {
-          backgroundColor:'#1e2026', borderColor:'#353840', borderWidth:1,
-          titleColor:'#e8eaf0', bodyColor:'#9aa0b0',
-          titleFont:{family:MONO,size:11}, bodyFont:{family:MONO,size:10},
-          callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} (${(ctx.parsed/sorted.reduce((s,[,v])=>s+v,0)*100).toFixed(1)}%)` }
-        }
-      }
-    }
+    data: { labels: mLabels, datasets: [{ data: mData, backgroundColor: mColors, borderColor: '#16181c', borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: {font:{size:9}} } } }
   });
-}
 
-function renderChartByTask(all) {
-  // Aggregate by normalized task name
-  const taskSet = {};
-  all.forEach(d => {
-    const task = d.task || 'unknown';
-    if (!taskSet[task]) taskSet[task] = { off:[], on:[] };
-    if (d.state==='OFF') taskSet[task].off.push(d);
-    else if (d.state==='ON') taskSet[task].on.push(d);
+  // By Task
+  const allTasks = [...new Set(all.map(d=>d.task))].sort();
+  const taskPctOff = allTasks.map(t => {
+    const tData = all.filter(d=>d.task===t && d.state==='OFF');
+    const totFog = tData.reduce((s,d)=>s+d.totalFog,0);
+    const totDur = tData.reduce((s,d)=>s+(d.trialDuration||0),0);
+    return totDur ? (totFog/totDur)*100 : 0;
   });
-  const tasks = Object.keys(taskSet).sort();
-  const pctFn = arr => {
-    if (!arr.length) return null;
-    const fog = arr.reduce((s,x)=>s+x.totalFog,0);
-    const tri = arr.reduce((s,x)=>s+(x.trialDuration||0),0);
-    return tri ? fog/tri*100 : null;
-  };
-  const offVals = tasks.map(t => pctFn(taskSet[t].off));
-  const onVals  = tasks.map(t => pctFn(taskSet[t].on));
+  const taskPctOn = allTasks.map(t => {
+    const tData = all.filter(d=>d.task===t && d.state==='ON');
+    const totFog = tData.reduce((s,d)=>s+d.totalFog,0);
+    const totDur = tData.reduce((s,d)=>s+(d.trialDuration||0),0);
+    return totDur ? (totFog/totDur)*100 : 0;
+  });
+
   makeChart('chartByTask', {
     type: 'bar',
     data: {
-      labels: tasks.map(prettyTask),
+      labels: allTasks.map(prettyTask),
       datasets: [
-        { label:'OFF', data:offVals, backgroundColor:OFF_BG, borderColor:OFF_BD, borderWidth:1, borderRadius:3 },
-        { label:'ON',  data:onVals,  backgroundColor:ON_BG,  borderColor:ON_BD,  borderWidth:1, borderRadius:3 }
+        { label: 'OFF State', data: taskPctOff, backgroundColor: OFF_BG, borderColor: OFF_BD, borderWidth: 1 },
+        { label: 'ON State', data: taskPctOn, backgroundColor: ON_BG, borderColor: ON_BD, borderWidth: 1 }
       ]
     },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      plugins: basePlugins({ label: ctx => ctx.parsed.y==null ? null : `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%` }),
-      scales: baseScales(null, '% Frozen')
-    }
+    options: { responsive: true, maintainAspectRatio: false, scales: baseScales('', '% Frozen'), plugins: basePlugins() }
   });
 }
 
 // ════════════════════════════════════════════════════════════
-//  GILADI CORRELATION
+//  CORRELATION MATH & RENDERING
 // ════════════════════════════════════════════════════════════
-function pearsonR(pts) {
-  const n = pts.length;
-  if (n < 3) return null;
-  const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
-  const mx = xs.reduce((a,b)=>a+b)/n, my = ys.reduce((a,b)=>a+b)/n;
-  const num = xs.reduce((s,x,i)=>s+(x-mx)*(ys[i]-my), 0);
-  const den = Math.sqrt(xs.reduce((s,x)=>s+(x-mx)**2, 0) * ys.reduce((s,y)=>s+(y-my)**2, 0));
-  return den===0 ? null : num/den;
+function pearsonR(x, y) {
+  const n = x.length;
+  if (n === 0) return 0;
+  const sumX = x.reduce((a,b)=>a+b,0), sumY = y.reduce((a,b)=>a+b,0);
+  const sumX2 = x.reduce((a,b)=>a+b*b,0), sumY2 = y.reduce((a,b)=>a+b*b,0);
+  const sumXY = x.reduce((a,v,i)=>a+v*y[i],0);
+  const num = (n * sumXY) - (sumX * sumY);
+  const den = Math.sqrt((n * sumX2 - sumX*sumX) * (n * sumY2 - sumY*sumY));
+  return den === 0 ? 0 : num / den;
 }
 
-function linReg(pts) {
-  const n = pts.length;
-  if (n < 2) return null;
-  const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
-  const mx = xs.reduce((a,b)=>a+b)/n, my = ys.reduce((a,b)=>a+b)/n;
-  const num = xs.reduce((s,x,i)=>s+(x-mx)*(ys[i]-my), 0);
-  const den = xs.reduce((s,x)=>s+(x-mx)**2, 0);
-  if (den===0) return null;
-  const slope = num/den;
-  return { slope, intercept: my - slope*mx };
+function getRClass(r) {
+  if (isNaN(r)) return 'r-weak';
+  const val = Math.abs(r);
+  if (val >= 0.7) return r > 0 ? 'r-strong-pos' : 'r-neg';
+  if (val >= 0.4) return r > 0 ? 'r-moderate-pos' : 'r-neg';
+  return 'r-weak';
 }
 
-function buildCorrPoints(all) {
-  const total=[], freq=[], dur=[];
-  all.forEach(trial => {
-    const normId = normalizeSubId(trial.subId);
-    if (!normId) return;
-    const csvEntry = csvMap.get(normId);
-    if (!csvEntry) return;
-    const giladiTask = elanTaskToGiladi(trial.task);
-    if (!giladiTask) return;
-    const { state } = trial;
-    if (state!=='OFF' && state!=='ON') return;
-    const gTotal = getGiladiScore(csvEntry.data, state, giladiTask, 'Total');
-    const gFreq  = getGiladiScore(csvEntry.data, state, giladiTask, 'Freq');
-    const gDur   = getGiladiScore(csvEntry.data, state, giladiTask, 'Dur');
-    const lbl = `${subLabel(trial.subId)} · ${state} · ${prettyTask(trial.task)}`;
-    if (gTotal!=null && trial.pctFrozen!=null) total.push({ x:gTotal, y:trial.pctFrozen, subId:trial.subId, state, label:lbl });
-    if (gFreq!=null)                           freq.push({  x:gFreq,  y:trial.fogEpisodes, subId:trial.subId, state, label:lbl });
-    if (gDur!=null && trial.fogEpisodes>0)     dur.push({   x:gDur,   y:trial.avgEpisode, subId:trial.subId, state, label:lbl });
-  });
-  return { total, freq, dur };
-}
-
-function scatterDatasets(pts, subjectColorMap) {
-  const bySub = {};
-  pts.forEach(p => { if (!bySub[p.subId]) bySub[p.subId]=[]; bySub[p.subId].push(p); });
-  return Object.entries(bySub).map(([subId, sPts]) => ({
-    label: subLabel(subId),
-    data: sPts.map(p => ({ x:p.x, y:p.y, label:p.label, state:p.state })),
-    backgroundColor: (subjectColorMap[subId]||'#4fc3f7')+'bb',
-    borderColor: subjectColorMap[subId]||'#4fc3f7',
-    pointRadius: 6, pointHoverRadius: 9, pointBorderWidth: 1.5,
-  }));
-}
-
-function regressionDataset(pts) {
-  if (pts.length < 2) return null;
-  const reg = linReg(pts);
-  if (!reg) return null;
-  const xs = pts.map(p=>p.x);
-  const minX = Math.min(...xs), maxX = Math.max(...xs);
-  return {
-    type: 'line', label: 'trend',
-    data: [{ x:minX, y:reg.slope*minX+reg.intercept }, { x:maxX, y:reg.slope*maxX+reg.intercept }],
-    borderColor: 'rgba(255,255,255,0.25)', borderWidth: 1.5,
-    borderDash: [4,4], pointRadius: 0, fill: false,
-  };
-}
-
-function rClass(r) {
-  if (r===null) return { cls:'r-weak', label:'n/a' };
-  const abs = Math.abs(r);
-  if (abs >= 0.7) return { cls: r>=0 ? 'r-strong-pos' : 'r-neg', label: r>=0 ? 'strong +' : 'strong −' };
-  if (abs >= 0.4) return { cls: r>=0 ? 'r-moderate-pos' : 'r-neg', label: r>=0 ? 'moderate +' : 'moderate −' };
-  return { cls:'r-weak', label:'weak' };
-}
-
-function makeCorrScatter(id, pts, subjectColorMap, xLabel, yLabel, rBadgeId) {
-  const r = pearsonR(pts);
-  const rInfo = rClass(r);
-  if (rBadgeId) {
-    const badge = document.getElementById(rBadgeId);
-    if (badge) {
-      badge.textContent = r!=null ? `r = ${r.toFixed(3)}` : 'r = —';
-      badge.className = `r-badge ${rInfo.cls}`;
-    }
-  }
-  const datasets = scatterDatasets(pts, subjectColorMap);
-  const regDs = regressionDataset(pts);
-  if (regDs) datasets.push(regDs);
-  makeChart(id, {
-    type: 'scatter',
-    data: { datasets },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      plugins: {
-        legend: { labels: { color:'#9aa0b0', font:{family:MONO,size:9}, boxWidth:10,
-          filter: item => item.text !== 'trend' } },
-        tooltip: {
-          backgroundColor:'#1e2026', borderColor:'#353840', borderWidth:1,
-          titleColor:'#e8eaf0', bodyColor:'#9aa0b0',
-          titleFont:{family:MONO,size:10}, bodyFont:{family:MONO,size:9},
-          callbacks: {
-            title: () => '',
-            label: ctx => ctx.raw.label
-              ? [ctx.raw.label, `Giladi: ${ctx.raw.x}  ELAN: ${(+ctx.raw.y).toFixed(2)}`]
-              : `(${ctx.parsed.x}, ${ctx.parsed.y.toFixed(2)})`
-          }
-        }
-      },
-      scales: {
-        x: {
-          ticks:{color:'#6b7180',font:{family:MONO,size:9}}, grid:{color:'#2a2d35'}, border:{color:'#353840'},
-          title:{display:true,text:xLabel,color:'#6b7180',font:{size:9,family:MONO}}
-        },
-        y: {
-          ticks:{color:'#6b7180',font:{family:MONO,size:9}}, grid:{color:'#2a2d35'}, border:{color:'#353840'},
-          title:{display:true,text:yLabel,color:'#6b7180',font:{size:9,family:MONO}}
-        }
-      }
-    }
-  });
-  return r;
-}
-
-function renderGiladiCorrelation(all) {
-  const noCSV = document.getElementById('giladiNoCSV');
-  const giladiCharts = document.getElementById('giladiCharts');
+function renderCorrelations(allElan) {
+  const noCsv = document.getElementById('giladiNoCSV');
+  const charts = document.getElementById('giladiCharts');
+  
   if (csvMap.size === 0) {
-    noCSV.style.display = 'flex';
-    giladiCharts.style.display = 'none';
+    noCsv.style.display = 'flex';
+    charts.style.display = 'none';
     return;
   }
-  noCSV.style.display = 'none';
-  giladiCharts.style.display = 'block';
+  noCsv.style.display = 'none';
+  charts.style.display = 'block';
 
-  const { total, freq, dur } = buildCorrPoints(all);
-  // Subject color map
-  const subjects = [...new Set(all.map(d=>d.subId))].sort();
-  const subjectColorMap = {};
-  subjects.forEach((s,i) => { subjectColorMap[s] = SUBJECT_COLORS[i % SUBJECT_COLORS.length]; });
+  let pairedDur = [], pairedFreq = [], pairedTotal = [];
 
-  const rTotal = makeCorrScatter('chartCorrTotal', total, subjectColorMap, 'Giladi Total Score', '% Time Frozen', 'rCorrTotal');
-  const rFreq  = makeCorrScatter('chartCorrFreq',  freq,  subjectColorMap, 'Giladi Frequency Score', 'FOG Episode Count', 'rCorrFreq');
-  const rDur   = makeCorrScatter('chartCorrDur',   dur,   subjectColorMap, 'Giladi Duration Score', 'Avg Episode Duration (s)', 'rCorrDur');
+  allElan.forEach(e => {
+    const nId = normalizeSubId(e.subId);
+    if (!csvMap.has(nId)) return;
+    
+    const csvData = csvMap.get(nId).data;
+    const gTask = elanTaskToGiladi(e.task);
+    if (!gTask || e.state === 'UNKNOWN') return;
 
-  // Correlation summary table
-  const rows = [
-    { label:'Giladi Total vs % Frozen',      r:rTotal, n:total.length, desc:'Overall severity' },
-    { label:'Giladi Freq vs Episode Count',  r:rFreq,  n:freq.length,  desc:'Frequency match' },
-    { label:'Giladi Dur vs Avg Ep. Duration',r:rDur,   n:dur.length,   desc:'Duration match'  },
-  ];
-  const tableHtml = `<table class="corr-table">
-    <thead><tr><th>Comparison</th><th>n</th><th>r</th><th>Strength</th><th>Context</th></tr></thead>
-    <tbody>${rows.map(row => {
-      const ri = rClass(row.r);
-      const barW = row.r!=null ? Math.abs(row.r)*60 : 0;
-      const barColor = row.r==null ? '#2a2d35' : row.r>=0 ? '#a5d6a7' : '#ef9a9a';
-      return `<tr>
-        <td style="color:var(--text)">${row.label}</td>
-        <td class="n-label">${row.n}</td>
-        <td><span class="r-val ${ri.cls}">${row.r!=null ? row.r.toFixed(3) : '—'}</span>
-          <span class="interp-bar" style="width:${barW}px;background:${barColor}"></span></td>
-        <td><span class="${ri.cls}" style="font-size:0.7rem">${ri.label}</span></td>
-        <td style="color:var(--muted);font-size:0.68rem">${row.desc}</td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table>`;
+    // Dur mapping
+    const gDur = getGiladiScore(csvData, e.state, gTask, 'Dur');
+    if (gDur !== null) pairedDur.push({ x: e.avgEpisode, y: gDur, label: `${subLabel(nId)} ${e.state} ${gTask}` });
 
-  // Add note if few matches
-  const minN = Math.min(total.length, freq.length, dur.length);
-  const noteHtml = minN < 5 ? `<div style="margin-top:0.8rem;font-size:0.68rem;color:var(--muted2);font-family:${MONO}">⚠ Low n (${minN} matched pairs). Load more paired files for reliable correlations.</div>` : '';
-  document.getElementById('corrTableWrap').innerHTML = tableHtml + noteHtml;
+    // Freq mapping
+    const gFreq = getGiladiScore(csvData, e.state, gTask, 'Freq');
+    if (gFreq !== null) pairedFreq.push({ x: e.fogEpisodes, y: gFreq, label: `${subLabel(nId)} ${e.state} ${gTask}` });
+
+    // Total mapping
+    const gTotal = getGiladiScore(csvData, e.state, gTask, 'Total');
+    if (gTotal !== null) pairedTotal.push({ x: e.totalFog, y: gTotal, label: `${subLabel(nId)} ${e.state} ${gTask}` });
+  });
+
+  const rDur = pearsonR(pairedDur.map(d=>d.x), pairedDur.map(d=>d.y));
+  const rFreq = pearsonR(pairedFreq.map(d=>d.x), pairedFreq.map(d=>d.y));
+  const rTot = pearsonR(pairedTotal.map(d=>d.x), pairedTotal.map(d=>d.y));
+
+  document.getElementById('rCorrDur').textContent = pairedDur.length > 2 ? `r = ${rDur.toFixed(2)}` : 'r = N/A';
+  document.getElementById('rCorrFreq').textContent = pairedFreq.length > 2 ? `r = ${rFreq.toFixed(2)}` : 'r = N/A';
+  document.getElementById('rCorrTotal').textContent = pairedTotal.length > 2 ? `r = ${rTot.toFixed(2)}` : 'r = N/A';
+
+  const drawScatter = (id, data, title, xLab, yLab) => {
+    makeChart(id, {
+      type: 'scatter',
+      data: { datasets: [{ label: title, data: data, backgroundColor: 'rgba(79,195,247,0.7)', borderColor: '#4fc3f7', borderWidth: 1 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: baseScales(xLab, yLab),
+        plugins: basePlugins((ctx) => `${ctx[0].raw.label}: ELAN=${fmt(ctx[0].raw.x)}, Giladi=${ctx[0].raw.y}`)
+      }
+    });
+  };
+
+  drawScatter('chartCorrTotal', pairedTotal, 'Total', 'ELAN Total FOG (s)', 'Giladi Total Score');
+  drawScatter('chartCorrFreq', pairedFreq, 'Frequency', 'ELAN Episode Count', 'Giladi Frequency Score');
+  drawScatter('chartCorrDur', pairedDur, 'Duration', 'ELAN Avg Episode (s)', 'Giladi Duration Score');
+
+  document.getElementById('corrTableWrap').innerHTML = `
+    <table class="corr-table">
+      <thead><tr><th>Metric Pair</th><th>N Pairs</th><th>Pearson r</th><th>Strength</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Giladi Total ↔ Total FOG Time</td>
+          <td>${pairedTotal.length}</td>
+          <td><span class="r-val ${getRClass(rTot)}">${pairedTotal.length > 2 ? fmt(rTot,3) : '—'}</span></td>
+          <td>${getStrengthWord(rTot, pairedTotal.length)}</td>
+        </tr>
+        <tr>
+          <td>Giladi Frequency ↔ Episode Count</td>
+          <td>${pairedFreq.length}</td>
+          <td><span class="r-val ${getRClass(rFreq)}">${pairedFreq.length > 2 ? fmt(rFreq,3) : '—'}</span></td>
+          <td>${getStrengthWord(rFreq, pairedFreq.length)}</td>
+        </tr>
+        <tr>
+          <td>Giladi Duration ↔ Avg Episode (s)</td>
+          <td>${pairedDur.length}</td>
+          <td><span class="r-val ${getRClass(rDur)}">${pairedDur.length > 2 ? fmt(rDur,3) : '—'}</span></td>
+          <td>${getStrengthWord(rDur, pairedDur.length)}</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
 }
 
+function getStrengthWord(r, n) {
+  if (n < 3 || isNaN(r)) return '—';
+  const val = Math.abs(r);
+  if (val >= 0.7) return 'Strong';
+  if (val >= 0.4) return 'Moderate';
+  return 'Weak';
+}
+
+
 // ════════════════════════════════════════════════════════════
-//  OFF vs ON COMPARISON
+//  LEGACY TABLES & COMPARISONS
 // ════════════════════════════════════════════════════════════
 function renderCompare(all) {
   const section = document.getElementById('compareSection');
-  const offData = all.filter(d=>d.state==='OFF');
-  const onData  = all.filter(d=>d.state==='ON');
-  if (!offData.length || !onData.length) { section.style.display='none'; return; }
-  section.style.display='block';
+  const offData = all.filter(d => d.state === 'OFF');
+  const onData  = all.filter(d => d.state === 'ON');
+  if (!offData.length || !onData.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
   function aggStats(arr) {
     const eps = arr.reduce((s,d)=>s+d.fogEpisodes,0);
     const fog = arr.reduce((s,d)=>s+d.totalFog,0);
     const tri = arr.reduce((s,d)=>s+(d.trialDuration||0),0);
-    return { eps, fog, tri, pct:tri?(fog/tri*100):null, avg:eps?fog/eps:0 };
+    return { eps, fog, tri, pct: tri?(fog/tri*100):null, avg: eps?fog/eps:0 };
   }
-  function card(label,cls,data,n) {
-    return `<div class="compare-card ${cls}"><h3>${label} STATE · ${n} trials</h3>
+  const off = aggStats(offData), on = aggStats(onData);
+  function card(label, cls, data, n) {
+    return `<div class="compare-card ${cls}">
+      <h3>${label} STATE · ${n} trials</h3>
       <div class="compare-stat"><span class="cs-label">FOG episodes</span><span class="cs-val">${data.eps}</span></div>
       <div class="compare-stat"><span class="cs-label">Total FOG time</span><span class="cs-val">${fmt(data.fog,2)} s</span></div>
       <div class="compare-stat"><span class="cs-label">% time frozen</span><span class="cs-val">${data.pct!=null?fmt(data.pct,1)+'%':'—'}</span></div>
       <div class="compare-stat"><span class="cs-label">Avg episode dur</span><span class="cs-val">${fmt(data.avg,2)} s</span></div>
     </div>`;
   }
-  document.getElementById('compareGrid').innerHTML =
-    card('OFF','off-card',aggStats(offData),offData.length) + card('ON','on-card',aggStats(onData),onData.length);
+  document.getElementById('compareGrid').innerHTML = card('OFF','off-card',off,offData.length) + card('ON','on-card',on,onData.length);
 }
 
 function renderSubjectCompare(all) {
   const section = document.getElementById('subjectCompareSection');
-  const subjects = [...new Set(all.map(d=>d.subId))].sort();
+  const subjects = [...new Set(all.map(d => normalizeSubId(d.subId)))].sort();
   const hasBoth = subjects.some(sub => {
-    const subs = all.filter(d=>d.subId===sub);
+    const subs = all.filter(d => normalizeSubId(d.subId) === sub);
     return subs.some(d=>d.state==='OFF') && subs.some(d=>d.state==='ON');
   });
-  if (!hasBoth) { section.style.display='none'; return; }
-  section.style.display='block';
+  if (!hasBoth) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  
   function aggStats(arr) {
-    const eps=arr.reduce((s,d)=>s+d.fogEpisodes,0);
-    const fog=arr.reduce((s,d)=>s+d.totalFog,0);
-    const tri=arr.reduce((s,d)=>s+(d.trialDuration||0),0);
-    return { eps,fog,tri,pct:tri?(fog/tri*100):null,avg:eps?fog/eps:0 };
+    const eps = arr.reduce((s,d)=>s+d.fogEpisodes,0);
+    const fog = arr.reduce((s,d)=>s+d.totalFog,0);
+    const tri = arr.reduce((s,d)=>s+(d.trialDuration||0),0);
+    return { eps, fog, tri, pct: tri?(fog/tri*100):null, avg: eps?fog/eps:0 };
   }
   const wrap = document.getElementById('subjectCompareWrap');
   wrap.innerHTML = subjects.map(sub => {
-    const subData=all.filter(d=>d.subId===sub);
-    const offData=subData.filter(d=>d.state==='OFF');
-    const onData=subData.filter(d=>d.state==='ON');
+    const subData = all.filter(d => normalizeSubId(d.subId) === sub);
+    const offData = subData.filter(d => d.state === 'OFF');
+    const onData  = subData.filter(d => d.state === 'ON');
     if (!offData.length && !onData.length) return '';
-    const rows=[
-      ['FOG episodes',    offData.length?aggStats(offData).eps:'—',  onData.length?aggStats(onData).eps:'—'],
-      ['Total FOG (s)',   offData.length?fmt(aggStats(offData).fog,2):'—', onData.length?fmt(aggStats(onData).fog,2):'—'],
-      ['% time frozen',   offData.length?(aggStats(offData).pct!=null?fmt(aggStats(offData).pct,1)+'%':'—'):'—', onData.length?(aggStats(onData).pct!=null?fmt(aggStats(onData).pct,1)+'%':'—'):'—'],
-      ['Avg episode (s)', offData.length?fmt(aggStats(offData).avg,2):'—', onData.length?fmt(aggStats(onData).avg,2):'—'],
+    const rows = [
+      ['FOG episodes',   offData.length ? aggStats(offData).eps : '—',  onData.length ? aggStats(onData).eps : '—'],
+      ['Total FOG (s)',  offData.length ? fmt(aggStats(offData).fog,2) : '—', onData.length ? fmt(aggStats(onData).fog,2) : '—'],
+      ['% time frozen',  offData.length ? (aggStats(offData).pct!=null?fmt(aggStats(offData).pct,1)+'%':'—') : '—', onData.length ? (aggStats(onData).pct!=null?fmt(aggStats(onData).pct,1)+'%':'—') : '—'],
+      ['Avg episode (s)', offData.length ? fmt(aggStats(offData).avg,2) : '—', onData.length ? fmt(aggStats(onData).avg,2) : '—'],
     ];
     return `<div class="subject-compare-block">
-      <h3>◈ ${subLabel(sub)} · ${subData.length} trials</h3>
+      <h3>◈ SUB ${subLabel(sub)} · ${subData.length} trials</h3>
       <div class="compare-grid" style="margin-bottom:0">
-        ${offData.length?`<div class="compare-card off-card"><h3>OFF · ${offData.length} trials</h3>${rows.map(r=>`<div class="compare-stat"><span class="cs-label">${r[0]}</span><span class="cs-val">${r[1]}</span></div>`).join('')}</div>`:''}
-        ${onData.length?`<div class="compare-card on-card"><h3>ON · ${onData.length} trials</h3>${rows.map(r=>`<div class="compare-stat"><span class="cs-label">${r[0]}</span><span class="cs-val">${r[2]}</span></div>`).join('')}</div>`:''}
+        ${offData.length ? `<div class="compare-card off-card"><h3>OFF · ${offData.length} trials</h3>
+          ${rows.map(r=>`<div class="compare-stat"><span class="cs-label">${r[0]}</span><span class="cs-val">${r[1]}</span></div>`).join('')}
+        </div>` : ''}
+        ${onData.length ? `<div class="compare-card on-card"><h3>ON · ${onData.length} trials</h3>
+          ${rows.map(r=>`<div class="compare-stat"><span class="cs-label">${r[0]}</span><span class="cs-val">${r[2]}</span></div>`).join('')}
+        </div>` : ''}
       </div>
     </div>`;
   }).join('');
 }
 
-// ════════════════════════════════════════════════════════════
-//  MANIFESTATION PILLS
-// ════════════════════════════════════════════════════════════
 function manifPills(counts) {
   if (!Object.keys(counts).length) return '<span class="pill pill-none">none</span>';
   return Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([k,v]) => {
-    let cls='pill-kinetic-nt';
-    if (k.includes('Akinetic')) cls='pill-akinetic';
-    else if (k.toLowerCase().includes('trembling')&&!k.toLowerCase().includes('no_')) cls='pill-kinetic-t';
-    else if (k.toLowerCase().includes('festination')) cls='pill-festination';
+    let cls = 'pill-kinetic-nt';
+    if (k.includes('Akinetic')) cls = 'pill-akinetic';
+    else if (k.toLowerCase().includes('trembling') && !k.toLowerCase().includes('no_')) cls = 'pill-kinetic-t';
+    else if (k.toLowerCase().includes('festination')) cls = 'pill-festination';
     return `<span class="pill ${cls}">${k} ×${v}</span>`;
   }).join('');
 }
 
-// ════════════════════════════════════════════════════════════
-//  EPISODE DETAIL SUB-TABLE
-// ════════════════════════════════════════════════════════════
-function buildEpisodeTable(episodes) {
-  if (!episodes||!episodes.length) return `<div class="no-episodes">No FOG episodes in this trial.</div>`;
-  const maxDur = Math.max(...episodes.map(e=>e.dur||0), 0.001);
-  const rows = episodes.map(ep => {
-    const barW = ((ep.dur||0)/maxDur*100).toFixed(1);
-    const manifLabel = [ep.manif, ep.fest?ep.fest+' (fest.)':''].filter(Boolean).join(', ')||'—';
-    return `<tr>
-      <td class="ep-num">#${ep.index}</td>
-      <td class="ep-time">${fmtHMS(ep.begin)}</td>
-      <td class="ep-time">${fmtHMS(ep.end)}</td>
-      <td class="ep-dur"><span class="ep-dur-bar-bg"><span class="ep-dur-bar-fill" style="width:${barW}%"></span></span>${fmt(ep.dur,3)} s</td>
-      <td style="color:var(--muted);font-size:0.68rem">${manifLabel}</td>
-    </tr>`;
-  }).join('');
-  return `<table class="episode-table"><thead><tr><th>#</th><th>Begin</th><th>End</th><th>Duration (s)</th><th>Manifestation</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
-
 let expandCounter = 0;
 function toggleEpisodes(id) {
-  const detailRow = document.getElementById('ep-detail-'+id);
-  const btn       = document.getElementById('ep-btn-'+id);
-  const taskRow   = document.getElementById('ep-row-'+id);
+  const detailRow = document.getElementById('ep-detail-' + id);
+  const btn = document.getElementById('ep-btn-' + id);
+  const taskRow = document.getElementById('ep-row-' + id);
   if (!detailRow) return;
   const isHidden = detailRow.classList.contains('hidden');
   detailRow.classList.toggle('hidden', !isHidden);
@@ -1127,53 +1028,83 @@ function toggleEpisodes(id) {
   taskRow.classList.toggle('expanded', isHidden);
 }
 
-// ════════════════════════════════════════════════════════════
-//  TASK TABLE
-// ════════════════════════════════════════════════════════════
 function renderTaskTable(all) {
-  const subjects = [...new Set(all.map(d=>d.subId))].sort();
+  const subjects = [...new Set(all.map(d => normalizeSubId(d.subId)))].sort();
+  const tbody = document.getElementById('taskTableBody');
   let html = '';
   subjects.forEach(sub => {
-    const subData = all.filter(d=>d.subId===sub);
-    const states  = [...new Set(subData.map(d=>d.state))].sort((a,b)=>a==='OFF'?-1:1);
+    const subData = all.filter(d => normalizeSubId(d.subId) === sub);
+    const states = [...new Set(subData.map(d => d.state))].sort((a,b) => a==='OFF'?-1:1);
     const totalEps = subData.reduce((s,d)=>s+d.fogEpisodes,0);
     const totalFog = subData.reduce((s,d)=>s+d.totalFog,0);
-    html += `<tr class="subject-row"><td colspan="9">◈ ${subLabel(sub)}<span class="sub-meta">${subData.length} trial${subData.length!==1?'s':''} · ${totalEps} ep · ${fmt(totalFog,1)} s FOG</span></td></tr>`;
+    
+    html += `<tr class="subject-row"><td colspan="9">◈ ${subLabel(sub)} <span class="sub-meta">${subData.length} trial(s) · ${totalEps} ep · ${fmt(totalFog,1)} s FOG</span></td></tr>`;
+    
     states.forEach(state => {
-      const stateData = subData.filter(d=>d.state===state).sort((a,b)=>a.task.localeCompare(b.task));
-      const stateClass = state==='OFF'?'state-off':state==='ON'?'state-on':'';
-      const stateEps=stateData.reduce((s,d)=>s+d.fogEpisodes,0);
-      const stateFog=stateData.reduce((s,d)=>s+d.totalFog,0);
-      html += `<tr class="state-group-row ${stateClass}"><td colspan="9">${state} STATE · ${stateData.length} trial${stateData.length!==1?'s':''} · ${stateEps} ep · ${fmt(stateFog,1)} s FOG</td></tr>`;
+      const stateData = subData.filter(d => d.state === state).sort((a,b) => a.task.localeCompare(b.task));
+      const stateClass = state === 'OFF' ? 'state-off' : state === 'ON' ? 'state-on' : '';
+      const stateEps = stateData.reduce((s,d)=>s+d.fogEpisodes,0);
+      const stateFog = stateData.reduce((s,d)=>s+d.totalFog,0);
+      
+      html += `<tr class="state-group-row ${stateClass}">
+        <td colspan="9">${state} STATE · ${stateData.length} trial(s) · ${stateEps} ep · ${fmt(stateFog,1)} s FOG</td>
+      </tr>`;
+      
       stateData.forEach(d => {
         const id = ++expandCounter;
         const badgeCls = d.state==='OFF'?'badge-off':d.state==='ON'?'badge-on':'';
-        const pct = d.pctFrozen!=null?d.pctFrozen:null;
-        const barW = pct!=null?Math.min(pct,100).toFixed(1):0;
-        const epLabel = d.fogEpisodes>0
-          ? `<button class="expand-btn" id="ep-btn-${id}"><span class="arrow">▶</span> ${d.fogEpisodes} ep</button>`
+        const pct = d.pctFrozen != null ? d.pctFrozen : null;
+        const barW = pct != null ? Math.min(pct, 100).toFixed(1) : 0;
+        const epLabel = d.fogEpisodes > 0
+          ? `<button class="expand-btn" id="ep-btn-${id}" onclick="event.stopPropagation();toggleEpisodes(${id})"><span class="arrow">▶</span> ${d.fogEpisodes} ep</button>`
           : `<span style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted2)">—</span>`;
+          
         html += `<tr class="task-row" id="ep-row-${id}" onclick="toggleEpisodes(${id})">
-          <td class="task-name">${d.task||d.filename}</td>
+          <td class="task-name">${d.task || d.filename}</td>
           <td><span class="state-badge ${badgeCls}">${d.state}</span></td>
-          <td>${d.trialDuration!=null?fmt(d.trialDuration,2):'—'}</td>
+          <td>${d.trialDuration != null ? fmt(d.trialDuration,2) : '—'}</td>
           <td>${d.fogEpisodes}</td>
           <td>${fmt(d.totalFog,3)}</td>
-          <td class="pct-cell"><div class="mini-bar-wrap"><div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${barW}%"></div></div>${pct!=null?fmt(pct,1)+'%':'—'}</div></td>
-          <td>${d.fogEpisodes?fmt(d.avgEpisode,3):'—'}</td>
+          <td class="pct-cell">
+            <div class="mini-bar-wrap">
+              <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${barW}%"></div></div>
+              ${pct!=null ? fmt(pct,1)+'%' : '—'}
+            </div>
+          </td>
+          <td>${d.fogEpisodes ? fmt(d.avgEpisode,3) : '—'}</td>
           <td><div class="pill-list">${manifPills(d.manifCounts)}</div></td>
           <td>${epLabel}</td>
-        </tr>
-        <tr class="episode-detail-row hidden" id="ep-detail-${id}">
-          <td colspan="9"><div class="episode-inner">
-            <div class="episode-table-label">Episode breakdown · ${d.task} · ${d.state}</div>
-            ${buildEpisodeTable(d.episodes)}
-          </div></td>
+        </tr>`;
+        
+        let episodeRows = `<div class="no-episodes">No FOG episodes in this trial.</div>`;
+        if (d.episodes && d.episodes.length) {
+          const maxDur = Math.max(...d.episodes.map(e => e.dur || 0), 0.001);
+          const trs = d.episodes.map(ep => {
+            const bw = ((ep.dur || 0) / maxDur * 100).toFixed(1);
+            const mLab = [ep.manif, ep.fest ? ep.fest+' (fest.)' : ''].filter(Boolean).join(', ') || '—';
+            return `<tr>
+              <td class="ep-num">#${ep.index}</td>
+              <td class="ep-time">${fmtHMS(ep.begin)}</td>
+              <td class="ep-time">${fmtHMS(ep.end)}</td>
+              <td class="ep-dur"><span class="ep-dur-bar-bg"><span class="ep-dur-bar-fill" style="width:${bw}%"></span></span>${fmt(ep.dur, 3)} s</td>
+              <td style="color:var(--muted);font-size:0.68rem">${mLab}</td>
+            </tr>`;
+          }).join('');
+          episodeRows = `<table class="episode-table"><thead><tr><th>#</th><th>Begin</th><th>End</th><th>Duration (s)</th><th>Manifestation</th></tr></thead><tbody>${trs}</tbody></table>`;
+        }
+
+        html += `<tr class="episode-detail-row hidden" id="ep-detail-${id}">
+          <td colspan="9">
+            <div class="episode-inner">
+              <div class="episode-table-label">Episode breakdown · ${prettyTask(d.task)} · ${d.state}</div>
+              ${episodeRows}
+            </div>
+          </td>
         </tr>`;
       });
     });
   });
-  document.getElementById('taskTableBody').innerHTML = html;
+  tbody.innerHTML = html;
 }
 </script>
 </body>
