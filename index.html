@@ -45,6 +45,7 @@
   }
   header h1 { font-family: 'IBM Plex Mono', monospace; font-size: 1.1rem; font-weight: 600; letter-spacing: 0.08em; color: var(--accent); }
   header span { font-size: 0.78rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+  
   .drop-zone {
     border: 1.5px dashed var(--border2); border-radius: var(--r);
     padding: 3rem 2rem; text-align: center; cursor: pointer;
@@ -53,10 +54,11 @@
   }
   .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: rgba(79,195,247,0.04); }
   .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-  .drop-icon { width: 36px; height: 36px; margin: 0 auto 1rem; color: var(--muted); }
-  .drop-zone p { font-size: 0.88rem; color: var(--muted); line-height: 1.6; }
+  .drop-icon { width: 36px; height: 36px; margin: 0 auto 1rem; color: var(--muted); pointer-events: none; }
+  .drop-zone p { font-size: 0.88rem; color: var(--muted); line-height: 1.6; pointer-events: none; }
   .drop-zone p strong { color: var(--text); font-weight: 500; }
-  .drop-zone .formats { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--accent); margin-top: 0.4rem; }
+  .drop-zone .formats { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--accent); margin-top: 0.4rem; pointer-events: none; }
+  
   .files-loaded { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
   .file-chip {
     display: flex; align-items: center; gap: 0.4rem;
@@ -68,6 +70,7 @@
   .file-chip .state-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   .file-chip .remove { cursor: pointer; color: var(--muted); font-size: 0.9rem; line-height: 1; margin-left: 0.2rem; }
   .file-chip .remove:hover { color: var(--off-color); }
+  
   .btn {
     display: inline-flex; align-items: center; gap: 0.5rem;
     padding: 0.55rem 1.2rem; border-radius: var(--r);
@@ -81,18 +84,21 @@
   .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-ghost:hover { border-color: var(--border2); }
   .controls { display: flex; gap: 0.7rem; margin-bottom: 2rem; flex-wrap: wrap; align-items: center; }
+  
   #results { display: none; }
   .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
   .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1.1rem 1.2rem; }
   .stat-card .label { font-size: 0.7rem; font-family: 'IBM Plex Mono', monospace; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.4rem; }
   .stat-card .value { font-size: 1.7rem; font-family: 'IBM Plex Mono', monospace; font-weight: 600; line-height: 1; }
   .stat-card .sub { font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; }
+  
   .section-title {
     font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; text-transform: uppercase;
     letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.8rem; margin-top: 2rem;
     display: flex; align-items: center; gap: 0.6rem;
   }
   .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  
   .manif-bar-wrap { margin-bottom: 2rem; }
   .manif-row { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem; font-size: 0.82rem; }
   .manif-label { width: 200px; flex-shrink: 0; font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--muted); }
@@ -100,7 +106,7 @@
   .manif-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
   .manif-count { width: 60px; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--muted); }
 
-  /* ── Charts ──────────────────────────────────────────── */
+  /* Charts */
   .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
   .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1.1rem 1.2rem; }
   .chart-card-full { grid-column: 1 / -1; }
@@ -152,10 +158,8 @@
   tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
   tbody tr:last-child { border-bottom: none; }
   tr.subject-row td {
-    background: rgba(121,134,203,0.08);
-    border-top: 1px solid rgba(121,134,203,0.25);
-    border-bottom: 1px solid rgba(121,134,203,0.15);
-    padding: 0.5rem 0.9rem;
+    background: rgba(121,134,203,0.08); border-top: 1px solid rgba(121,134,203,0.25);
+    border-bottom: 1px solid rgba(121,134,203,0.15); padding: 0.5rem 0.9rem;
     font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; font-weight: 600;
     color: var(--subject-accent); letter-spacing: 0.1em;
   }
@@ -172,10 +176,8 @@
   tr.task-row.expanded { background: rgba(79,195,247,0.04); }
   td.task-name { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--accent2); white-space: nowrap; padding-left: 2.5rem !important; }
   .expand-btn {
-    display: inline-flex; align-items: center; gap: 0.35rem;
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 4px; padding: 0.18rem 0.5rem;
-    font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem;
+    display: inline-flex; align-items: center; gap: 0.35rem; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 0.18rem 0.5rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem;
     color: var(--muted); cursor: pointer; transition: all 0.15s; white-space: nowrap;
   }
   .expand-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -211,6 +213,7 @@
   .pill-kinetic-nt  { background: rgba(128,203,196,0.15); color: var(--kinetic-nt); }
   .pill-festination { background: rgba(244,143,177,0.15); color: var(--festination); }
   .pill-none        { background: var(--surface2); color: var(--muted); }
+  
   .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
   .compare-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1.2rem; }
   .compare-card h3 { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; letter-spacing: 0.1em; margin-bottom: 1rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
@@ -225,6 +228,7 @@
   .subject-compare-wrap { margin-bottom: 2rem; }
   .subject-compare-block { margin-bottom: 1.5rem; }
   .subject-compare-block h3 { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--subject-accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.7rem; padding-bottom: 0.4rem; border-bottom: 1px solid rgba(121,134,203,0.2); }
+  
   @media (max-width: 700px) {
     body { padding: 1rem; }
     .compare-grid { grid-template-columns: 1fr; }
@@ -494,7 +498,7 @@ function parseElan(text, filename) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  CSV TRIAL SHEET PARSER 
+//  CSV TRIAL SHEET PARSER
 // ════════════════════════════════════════════════════════════
 function parseCsvSheet(text, filename) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -565,8 +569,11 @@ function getGiladiScore(csvData, state, giladiTask, metric) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  FILE HANDLING
+//  FILE HANDLING & DRAG-AND-DROP (FIXED)
 // ════════════════════════════════════════════════════════════
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+
 function loadFile(file) {
   return new Promise((res,rej) => {
     const reader = new FileReader();
@@ -576,15 +583,16 @@ function loadFile(file) {
   });
 }
 
-async function addFiles(files) {
+async function addFiles(fileList) {
   clearErrors();
+  const files = Array.from(fileList);
   for (const file of files) {
     const ext = file.name.split('.').pop().toLowerCase();
     if (ext === 'csv' || ext === 'tsv') {
       try {
         const { text } = await loadFile(file);
         const data = parseCsvSheet(text, file.name);
-        if (!data) { showError(`Could not parse CSV trial sheet: ${file.name}`); continue; }
+        if (!data) { showError(`Could not parse CSV trial sheet: ${file.name}. Is it formatted as Field/Value?`); continue; }
         csvMap.set(data.normId, data);
       } catch { showError(`Error reading: ${file.name}`); }
     } else {
@@ -643,10 +651,17 @@ function showError(msg) {
 function clearErrors() { document.getElementById('errorBox').innerHTML = ''; }
 
 const dz = document.getElementById('dropZone');
+dz.addEventListener('dragenter', e => { e.preventDefault(); dz.classList.add('drag-over'); });
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
-dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); addFiles(e.dataTransfer.files); });
-document.getElementById('fileInput').addEventListener('change', e => addFiles(e.target.files));
+dz.addEventListener('dragleave', e => { e.preventDefault(); dz.classList.remove('drag-over'); });
+dz.addEventListener('drop', e => { 
+  e.preventDefault(); 
+  dz.classList.remove('drag-over'); 
+  if (e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files); 
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files) addFiles(e.target.files);
+});
 
 // ════════════════════════════════════════════════════════════
 //  TRIAL MERGING ENGINE
@@ -1309,4 +1324,37 @@ function renderTaskTable(all) {
       const stateClass = state==='OFF'?'state-off':state==='ON'?'state-on':'';
       const stateEps=stateData.reduce((s,d)=>s+d.fogEpisodes,0);
       const stateFog=stateData.reduce((s,d)=>s+d.totalFog,0);
-      html += `<tr class="state-group-row ${stateClass}"><td colspan="9">${state} STATE · ${stateData.length} trial${stateData.length!==1?'s':''} · ${stateEps} ep ·
+      html += `<tr class="state-group-row ${stateClass}"><td colspan="9">${state} STATE · ${stateData.length} trial${stateData.length!==1?'s':''} · ${stateEps} ep · ${fmt(stateFog,1)} s FOG</td></tr>`;
+      stateData.forEach(d => {
+        const id = ++expandCounter;
+        const badgeCls = d.state==='OFF'?'badge-off':d.state==='ON'?'badge-on':'';
+        const pct = d.pctFrozen!=null?d.pctFrozen:null;
+        const barW = pct!=null?Math.min(pct,100).toFixed(1):0;
+        const epLabel = d.fogEpisodes>0
+          ? `<button class="expand-btn" id="ep-btn-${id}" onclick="event.stopPropagation();toggleEpisodes(${id})"><span class="arrow">▶</span> ${d.fogEpisodes} ep</button>`
+          : `<span style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted2)">—</span>`;
+        html += `<tr class="task-row" id="ep-row-${id}" onclick="toggleEpisodes(${id})">
+          <td class="task-name">${prettyTask(d.task)}</td>
+          <td><span class="state-badge ${badgeCls}">${d.state}</span></td>
+          <td>${d.trialDuration!=null?fmt(d.trialDuration,2):'—'}</td>
+          <td>${d.fogEpisodes}</td>
+          <td>${fmt(d.totalFog,3)}</td>
+          <td class="pct-cell"><div class="mini-bar-wrap"><div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${barW}%"></div></div>${pct!=null?fmt(pct,1)+'%':'—'}</div></td>
+          <td>${d.fogEpisodes?fmt(d.avgEpisode,3):'—'}</td>
+          <td><div class="pill-list">${manifPills(d.manifCounts)}</div></td>
+          <td>${epLabel}</td>
+        </tr>
+        <tr class="episode-detail-row hidden" id="ep-detail-${id}">
+          <td colspan="9"><div class="episode-inner">
+            <div class="episode-table-label">Episode breakdown · ${prettyTask(d.task)} · ${d.state} · <span style="text-transform:none;color:var(--muted)">[Source: ${d.filename}]</span></div>
+            ${buildEpisodeTable(d.episodes)}
+          </div></td>
+        </tr>`;
+      });
+    });
+  });
+  document.getElementById('taskTableBody').innerHTML = html;
+}
+</script>
+</body>
+</html>
