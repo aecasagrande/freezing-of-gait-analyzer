@@ -77,6 +77,7 @@
   .btn:active { transform: scale(0.98); }
   .btn:disabled { opacity: 0.35; cursor: not-allowed; }
   .btn-primary { background: var(--accent); color: #0e0f11; }
+  .btn-secondary { background: var(--fog-color); color: #0e0f11; }
   .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-ghost:hover { border-color: var(--border2); }
   .controls { display: flex; gap: 0.7rem; margin-bottom: 2rem; flex-wrap: wrap; align-items: center; }
@@ -88,7 +89,7 @@
   .stat-card .sub { font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; }
   .section-title {
     font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; text-transform: uppercase;
-    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.8rem;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.8rem; margin-top: 2rem;
     display: flex; align-items: center; gap: 0.6rem;
   }
   .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
@@ -255,6 +256,10 @@
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
     Analyse
   </button>
+  <button class="btn btn-secondary" id="exportBtn" disabled onclick="exportDataToCsv()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+    Export to CSV
+  </button>
   <button class="btn btn-ghost" id="clearBtn" onclick="clearAll()">Clear</button>
 </div>
 
@@ -265,7 +270,6 @@
   <div class="section-title">FOG manifestation types</div>
   <div class="manif-bar-wrap" id="manifBars"></div>
 
-  <!-- ── Visual Analytics Charts ───────────────────────────────────── -->
   <div class="section-title">Visual analytics</div>
   <div class="charts-grid" id="chartsGrid">
     <div class="chart-card">
@@ -290,7 +294,6 @@
     </div>
   </div>
 
-  <!-- ── Giladi ↔ ELAN Correlation ─────────────────────────────────── -->
   <div class="section-title">Giladi ↔ ELAN correlation</div>
   <div id="giladiSection">
     <div id="giladiNoCSV" class="no-csv-msg" style="display:none">
@@ -319,7 +322,6 @@
     </div>
   </div>
 
-  <!-- ── Existing comparison & table sections ───────────────────────── -->
   <div id="compareSection">
     <div class="section-title">OFF vs ON comparison</div>
     <div class="compare-grid" id="compareGrid"></div>
@@ -432,7 +434,6 @@ function parseName(filename) {
   const stateIdx = parts.findIndex(p => p === 'off' || p === 'on');
   const state = stateIdx >= 0 ? parts[stateIdx].toUpperCase() : 'UNKNOWN';
   
-  // Added 'sagit' explicitly along with 'sagittal'
   const camKeywords = ['front','sag','sagit','sagittal','rear','side','lateral','blur'];
   const taskParts = [];
   for (let i = stateIdx+1; i < parts.length; i++) {
@@ -493,21 +494,18 @@ function parseElan(text, filename) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  CSV TRIAL SHEET PARSER
+//  CSV TRIAL SHEET PARSER 
 // ════════════════════════════════════════════════════════════
 function parseCsvSheet(text, filename) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return null;
   
-  // Auto-detect delimiter
   let delim = '\t';
-  if (lines[0].indexOf('\t') === -1 && lines[0].indexOf(',') !== -1) {
-    delim = ',';
-  }
+  if (lines[0].indexOf('\t') === -1 && lines[0].indexOf(',') !== -1) delim = ',';
   
   const header = lines[0].split(delim).map(h => h.replace(/^"|"$/g, '').trim());
   if (header[0].toLowerCase() !== 'field') return null;
-  
+
   const data = {};
   for (let i = 1; i < lines.length; i++) {
     const parts = lines[i].split(delim);
@@ -521,29 +519,23 @@ function parseCsvSheet(text, filename) {
   let participantId = data['Participant ID'];
   let normId = normalizeSubId(participantId);
   
-  // Fallback to filename if CSV missing ID
   if (!normId) {
     normId = normalizeSubId(filename);
     participantId = normId ? `P-${normId}` : 'Unknown';
   }
-  
-  if (!normId) return null;
+
+  if (!normId) return null; 
   return { participantId, normId, data, filename };
 }
 
-// Normalize subject IDs: "P-001", "sub001", "001" → "001"
 function normalizeSubId(id) {
   const m = (id || '').match(/(\d+)/);
   return m ? String(parseInt(m[1])).padStart(3, '0') : null;
 }
-
-// Pretty-print subject IDs
 function subLabel(subId) {
   const norm = normalizeSubId(subId);
   return norm ? `P-${norm}` : subId.toUpperCase();
 }
-
-// Pretty-print task names
 function prettyTask(task) {
   return task.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
@@ -620,6 +612,7 @@ function renderChips() {
     chip.querySelector('.remove').addEventListener('click', e => {
       fileMap.delete(e.target.dataset.name); renderChips();
       document.getElementById('analyzeBtn').disabled = fileMap.size === 0;
+      document.getElementById('exportBtn').disabled = true;
     });
     wrap.appendChild(chip);
   }
@@ -636,8 +629,10 @@ function renderChips() {
 
 function clearAll() {
   fileMap.clear(); csvMap.clear(); renderChips(); clearErrors();
+  for (let key in chartInstances) { chartInstances[key].destroy(); delete chartInstances[key]; }
   document.getElementById('results').style.display = 'none';
   document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('exportBtn').disabled = true;
   document.getElementById('fileInput').value = '';
 }
 function showError(msg) {
@@ -653,12 +648,9 @@ dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
 dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); addFiles(e.dataTransfer.files); });
 document.getElementById('fileInput').addEventListener('change', e => addFiles(e.target.files));
 
-
 // ════════════════════════════════════════════════════════════
 //  TRIAL MERGING ENGINE
 // ════════════════════════════════════════════════════════════
-// If there are multiple TXT files for the same subject/state/task (e.g. _sagit and _front)
-// this merges them perfectly so they don't count as two separate trials.
 function getMergedElanData(fMap) {
   const groups = {};
   for (const [filename, d] of fMap) {
@@ -680,17 +672,15 @@ function getMergedElanData(fMap) {
   return Object.values(groups).map(g => {
     let mergedEps = [];
     if (g.episodes.length > 0) {
-      // Sort episodes chronologically
       g.episodes.sort((a, b) => a.begin - b.begin);
       let current = { ...g.episodes[0] };
       let manifs = new Set();
       if (current.manif) manifs.add(current.manif);
       if (current.fest) manifs.add(current.fest + ' (festination)');
       
-      // Union overlapping episodes
       for (let i = 1; i < g.episodes.length; i++) {
         const ep = g.episodes[i];
-        if (ep.begin <= current.end + 0.1) { // 0.1s overlap tolerance
+        if (ep.begin <= current.end + 0.1) {
           current.end = Math.max(current.end, ep.end);
           if (ep.manif) manifs.add(ep.manif);
           if (ep.fest) manifs.add(ep.fest + ' (festination)');
@@ -711,21 +701,20 @@ function getMergedElanData(fMap) {
     }
     mergedEps.forEach((ep, i) => { ep.index = i + 1; });
     
-    // Average metrics if multiple files
     const trialDuration = g.trialDurations.length ? g.trialDurations.reduce((a,b)=>a+b, 0)/g.trialDurations.length : null;
     const totalFog = mergedEps.reduce((s, ep) => s + ep.dur, 0);
     const fogEpisodes = mergedEps.length;
     
     const avgManifCounts = {};
     for (const [m, c] of Object.entries(g.manifCounts)) {
-      avgManifCounts[m] = c / g.files.length; // Don't double count manifestations if raters annotated same things
+      avgManifCounts[m] = c / g.files.length;
     }
-    
     const filenameDisplay = g.files.length > 1 ? `${g.files.length} Views Merged` : g.files[0];
 
     return {
       normId: g.normId, subId: g.subId, session: g.session, state: g.state, task: g.task,
-      filename: filenameDisplay, trialDuration, fogEpisodes, totalFog,
+      filename: filenameDisplay, rawFiles: g.files.join(' | '),
+      trialDuration, fogEpisodes, totalFog,
       pctFrozen: trialDuration ? (totalFog / trialDuration) * 100 : null,
       avgEpisode: fogEpisodes ? totalFog / fogEpisodes : 0,
       manifCounts: avgManifCounts, episodes: mergedEps
@@ -740,10 +729,11 @@ function runAnalysis() {
   const rawElan = [...fileMap.values()];
   if (!rawElan.length) return;
   
-  // Merge _sagit and _front into single trials!
   const all = getMergedElanData(fileMap); 
 
   document.getElementById('results').style.display = 'block';
+  document.getElementById('exportBtn').disabled = false; // Enable Export
+  
   renderSummary(all, rawElan.length);
   renderManifBars(all);
   renderCharts(all);
@@ -751,6 +741,86 @@ function runAnalysis() {
   renderCompare(all);
   renderSubjectCompare(all);
   renderTaskTable(all);
+}
+
+// ════════════════════════════════════════════════════════════
+//  CSV EXPORT ENGINE
+// ════════════════════════════════════════════════════════════
+function exportDataToCsv() {
+  const all = getMergedElanData(fileMap);
+  if (!all.length) {
+    alert("No data to export.");
+    return;
+  }
+
+  // Define Headers
+  const headers = [
+    "Participant_ID",
+    "State",
+    "Task_Name",
+    "ELAN_Source_Files",
+    "Trial_Duration_s",
+    "FOG_Episodes_Count",
+    "Total_FOG_Duration_s",
+    "Percent_Time_Frozen",
+    "Avg_Episode_Duration_s",
+    "Manifestations",
+    "Giladi_Matched_Task",
+    "Giladi_Total_Score",
+    "Giladi_Frequency_Score",
+    "Giladi_Duration_Score"
+  ];
+
+  const csvRows = [headers.join(',')];
+
+  all.forEach(d => {
+    const normId = d.normId;
+    const csvEntry = csvMap.get(normId);
+    const gTask = elanTaskToGiladi(d.task);
+
+    let gTotal = '', gFreq = '', gDur = '';
+    if (csvEntry && gTask && (d.state === 'OFF' || d.state === 'ON')) {
+      gTotal = getGiladiScore(csvEntry.data, d.state, gTask, 'Total') ?? '';
+      gFreq  = getGiladiScore(csvEntry.data, d.state, gTask, 'Freq') ?? '';
+      gDur   = getGiladiScore(csvEntry.data, d.state, gTask, 'Dur') ?? '';
+    }
+
+    const manifs = Object.entries(d.manifCounts).map(([k,v]) => `${k}:${v.toFixed(1)}`).join('; ');
+
+    const row = [
+      subLabel(d.subId),
+      d.state,
+      prettyTask(d.task),
+      `"${d.rawFiles}"`,
+      d.trialDuration != null ? d.trialDuration.toFixed(2) : '',
+      d.fogEpisodes,
+      d.totalFog.toFixed(3),
+      d.pctFrozen != null ? d.pctFrozen.toFixed(2) : '',
+      d.fogEpisodes ? d.avgEpisode.toFixed(3) : '',
+      `"${manifs}"`,
+      gTask || 'No Giladi Match',
+      gTotal,
+      gFreq,
+      gDur
+    ];
+
+    csvRows.push(row.join(','));
+  });
+
+  const csvString = csvRows.join('\n');
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  
+  const now = new Date();
+  const timestamp = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}`;
+  link.setAttribute('download', `PDHRV_FOG_Merged_Export_${timestamp}.csv`);
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1239,37 +1309,4 @@ function renderTaskTable(all) {
       const stateClass = state==='OFF'?'state-off':state==='ON'?'state-on':'';
       const stateEps=stateData.reduce((s,d)=>s+d.fogEpisodes,0);
       const stateFog=stateData.reduce((s,d)=>s+d.totalFog,0);
-      html += `<tr class="state-group-row ${stateClass}"><td colspan="9">${state} STATE · ${stateData.length} trial${stateData.length!==1?'s':''} · ${stateEps} ep · ${fmt(stateFog,1)} s FOG</td></tr>`;
-      stateData.forEach(d => {
-        const id = ++expandCounter;
-        const badgeCls = d.state==='OFF'?'badge-off':d.state==='ON'?'badge-on':'';
-        const pct = d.pctFrozen!=null?d.pctFrozen:null;
-        const barW = pct!=null?Math.min(pct,100).toFixed(1):0;
-        const epLabel = d.fogEpisodes>0
-          ? `<button class="expand-btn" id="ep-btn-${id}" onclick="event.stopPropagation();toggleEpisodes(${id})"><span class="arrow">▶</span> ${d.fogEpisodes} ep</button>`
-          : `<span style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted2)">—</span>`;
-        html += `<tr class="task-row" id="ep-row-${id}" onclick="toggleEpisodes(${id})">
-          <td class="task-name">${prettyTask(d.task)}</td>
-          <td><span class="state-badge ${badgeCls}">${d.state}</span></td>
-          <td>${d.trialDuration!=null?fmt(d.trialDuration,2):'—'}</td>
-          <td>${d.fogEpisodes}</td>
-          <td>${fmt(d.totalFog,3)}</td>
-          <td class="pct-cell"><div class="mini-bar-wrap"><div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${barW}%"></div></div>${pct!=null?fmt(pct,1)+'%':'—'}</div></td>
-          <td>${d.fogEpisodes?fmt(d.avgEpisode,3):'—'}</td>
-          <td><div class="pill-list">${manifPills(d.manifCounts)}</div></td>
-          <td>${epLabel}</td>
-        </tr>
-        <tr class="episode-detail-row hidden" id="ep-detail-${id}">
-          <td colspan="9"><div class="episode-inner">
-            <div class="episode-table-label">Episode breakdown · ${prettyTask(d.task)} · ${d.state} · <span style="text-transform:none;color:var(--muted)">[Source: ${d.filename}]</span></div>
-            ${buildEpisodeTable(d.episodes)}
-          </div></td>
-        </tr>`;
-      });
-    });
-  });
-  document.getElementById('taskTableBody').innerHTML = html;
-}
-</script>
-</body>
-</html>
+      html += `<tr class="state-group-row ${stateClass}"><td colspan="9">${state} STATE · ${stateData.length} trial${stateData.length!==1?'s':''} · ${stateEps} ep ·
