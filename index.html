@@ -25,6 +25,13 @@
        (protan/deutan ΔE ≥ 9 OKLab×100). The previous pink/green pair failed (ΔE 5.2). */
     --off: #d95926;
     --on: #199e70;
+    /* VR condition pair, validated on this surface with the same method as OFF/ON:
+       protan/deutan ΔE 16.3, tritan 17.0, normal-vision 23.0 (OKLab ×100), and each
+       ≥ 11 from both --off and --on. Never rendered in the same frame as OFF/ON —
+       four categorical hues cannot clear CVD separation here, so the Elevated×Ground
+       × OFF×ON matrix encodes magnitude on the amber ramp and identity by position. */
+    --elevated: #a275fc;
+    --ground: #1b6c99;
     --fog: #ffcc80;
     --akinetic: #ce93d8;
     --kinetic-t: #ff8a65;
@@ -153,7 +160,32 @@
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.35rem; vertical-align: 0; flex-shrink: 0; }
   .dot-off { background: var(--off); }
   .dot-on { background: var(--on); }
+  .dot-elevated { background: var(--elevated); }
+  .dot-ground { background: var(--ground); }
   .dot-unknown { background: var(--muted); }
+
+  /* ── VR 2×2 (state × condition) ───────────────────────── */
+  .vr-matrix-wrap { border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); overflow-x: auto; }
+  table.vr-matrix { border-collapse: separate; border-spacing: 3px; margin: 0.6rem; font-family: var(--mono); font-size: 0.72rem; }
+  table.vr-matrix th { color: var(--muted); font-weight: 500; padding: 0.3rem 0.5rem; text-align: left; white-space: nowrap; font-size: 0.68rem; }
+  table.vr-matrix th.ch { text-align: center; letter-spacing: 0.07em; color: var(--text2); }
+  table.vr-matrix td.vcell {
+    min-width: 8.6rem; padding: 0.55rem 0.7rem; border-radius: 4px; vertical-align: top;
+    background: rgba(255, 204, 128, var(--a, 0)); box-shadow: inset 0 0 0 1px var(--border);
+  }
+  table.vr-matrix td.vcell.dark { color: #0e0f11; }
+  table.vr-matrix td.vcell.dark .vsub { color: rgba(14,15,17,0.72); }
+  table.vr-matrix td.vcell.empty { background: transparent; color: var(--muted2); }
+  .vbig { font-size: 1.15rem; font-weight: 600; font-family: 'IBM Plex Sans', sans-serif; line-height: 1.1; }
+  /* --text2 rather than --muted: the tile fill rises with the value, and muted ink
+     stops reading against the stronger amber steps. */
+  .vsub { font-size: 0.64rem; color: var(--text2); margin-top: 0.2rem; line-height: 1.5; }
+  table.vr-matrix td.vcell.empty .vsub { color: var(--muted2); }
+  .vr-matrix-legend { display: flex; gap: 1rem; flex-wrap: wrap; font-family: var(--mono); font-size: 0.66rem; color: var(--muted); padding: 0 0.9rem 0.8rem; }
+  .vr-delta { font-family: var(--mono); font-size: 0.7rem; }
+  /* condition badges in the per-trial table ( .sub is scoped to table.data ) */
+  .cond-tag { margin-left: 0.35rem; font-size: 0.62rem; color: var(--muted); letter-spacing: 0.03em; }
+  .cond-tag.bad { color: var(--err); font-weight: 600; }
 
   /* ── Data checks ─────────────────────────────────────── */
   .checks-group { border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); margin-bottom: 0.6rem; }
@@ -420,6 +452,33 @@
     <div class="table-wrap" id="subjectCompareWrap"></div>
   </div>
 
+  <div id="vrSection" hidden>
+    <div class="section-title">VR plank · Elevated vs Ground <span class="counts" id="vrCounts"></span></div>
+    <div id="vrBanner"></div>
+    <div class="vr-matrix-wrap">
+      <table class="vr-matrix" id="vrMatrix"></table>
+      <div class="vr-matrix-legend" id="vrMatrixLegend"></div>
+    </div>
+    <div class="charts-grid two">
+      <div class="chart-card">
+        <div class="chart-card-title">
+          <span>VR by participant</span>
+          <div class="seg" id="vrMetricSeg" role="group" aria-label="VR metric">
+            <button type="button" data-metric="pct" aria-pressed="true">% frozen</button>
+            <button type="button" data-metric="eps" aria-pressed="false">Episodes</button>
+            <button type="button" data-metric="fog" aria-pressed="false">FOG (s)</button>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap tall"><canvas id="chartVrSubject" aria-label="VR metric by participant, Elevated and Ground"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-title"><span>SAM anxiety vs % time frozen</span><span class="r-badge" id="rVrSam">ρ —</span></div>
+        <div class="chart-canvas-wrap tall"><canvas id="chartVrSam" aria-label="SAM rating against percent time frozen for VR trials"></canvas></div>
+      </div>
+    </div>
+    <div class="table-wrap" id="vrTrialWrap"></div>
+  </div>
+
   <div class="section-title">Visual analytics</div>
   <div class="charts-grid">
     <div class="chart-card chart-card-full">
@@ -481,6 +540,7 @@
     <label>Participant <select id="fPid"></select></label>
     <label>State <select id="fState"><option value="">All</option><option>OFF</option><option>ON</option></select></label>
     <label>Task <select id="fTask"></select></label>
+    <label>VR condition <select id="fCond"><option value="">All</option><option value="elevated">Elevated</option><option value="ground">Ground</option><option value="none">No condition</option></select></label>
     <label><input type="checkbox" id="fFogOnly"> Only trials with FOG</label>
     <button class="btn-mini" type="button" id="expandAllBtn">Expand all</button>
     <button class="btn-mini" type="button" id="collapseAllBtn">Collapse all</button>
@@ -489,7 +549,7 @@
     <table class="trials" id="taskTable">
       <thead>
         <tr>
-          <th>Task</th><th>State</th><th>Trial dur (s)</th><th>FOG eps</th>
+          <th>Task</th><th>State</th><th>VR cond</th><th>Trial dur (s)</th><th>FOG eps</th>
           <th>Total FOG (s)</th><th>% frozen</th><th>Avg ep (s)</th>
           <th>Manifestations</th><th>Giladi T·F·D</th><th>Episodes</th>
         </tr>
@@ -535,11 +595,32 @@ const TASKS = [
     aliases: ['dualtaskwalk', 'dtwalk', 'dualwalk', 'dualtaskwalking'] },
   { code: 'dtturn',  label: 'DualTask Turns', short: 'DT-T',  re: /^(?:dt|dual(?:task)?)(?:360)?turns?$/,
     aliases: ['dualtaskturns', 'dualtaskturn', 'dtturns', 'dtturn', 'dualturns'] },
+  // VR pit-and-plank. Scored per trial under an Elevated or Ground condition, and
+  // has no Giladi counterpart — Giladi covers the over-ground protocol only.
+  { code: 'vr',      label: 'VR Plank Walk',  short: 'VR',    re: /^vr(?:walk|plank|trial)?$/,
+    aliases: [], noGiladi: true },
 ];
 const TASK_BY_CODE = Object.fromEntries(TASKS.map((t, i) => [t.code, Object.assign({ order: i }, t)]));
 const METRIC_ALIASES = { Total: ['total', 'sum', 'score', 'totalscore'], Freq: ['freq', 'frequency'], Dur: ['dur', 'duration'] };
 
 const STATE_RE = /^(off|on)$/i;
+// ── VR condition vocabulary ───────────────────────────────
+// The virtual-height ("Elevated") and floor-level ("Ground") conditions of the
+// VR plank paradigm, as they appear in annotation file names.
+const COND_RE = /^(elevated|elev|elvated|eelvated|high|height|raised|ground|grnd|grd|floor|flat|low)$/i;
+const COND_ELEVATED = /^(elevated|elev|elvated|eelvated|high|height|raised)$/i;
+/** 'elevated' | 'ground' | null */
+function normCond(s) {
+  const v = String(s == null ? '' : s).trim();
+  if (!COND_RE.test(v)) return null;
+  return COND_ELEVATED.test(v) ? 'elevated' : 'ground';
+}
+const COND_LABEL = { elevated: 'Elevated', ground: 'Ground' };
+// "vr", "vrtrial1", "vr1", "vrwalk03" — the VR task token, optionally carrying the trial number
+const VR_TOKEN_RE = /^vr(?:[-_]?(?:trial|walk|plank))?(\d{1,3})?$/i;
+// "walk01", "trial3", "t2" — a trial number in the token after a bare "vr"
+const VR_REP_RE = /^(?:walk|trial|plank|plankwalk|t)(\d{1,3})$/i;
+
 const VIEW_RE = /^(front|frontal|sag|sagit|sagitt|sagittal|sagital|lat|lateral|side|rear|back|top|overhead|cam\d*|camera\d*|view\d*)$/i;
 const PROC_RE = /^(blur|blurred|anon|anonymi[sz]ed|edit|edited|final|v\d+)$/i;
 const FILLER_RE = /^(giladi|trial|task|fog|pdhrv|pd|hrv|fr|c\d+)$/i;
@@ -560,7 +641,7 @@ function parseName(basename) {
   const stem = stemOf(basename);
   const tok = stem.split(/[_\s]+/).filter(Boolean);
   const low = tok.map(t => t.toLowerCase());
-  const out = { stem, prefixId: null, prefixState: null, subId: null, ses: null, state: null, taskRaw: '', view: null, rep: null };
+  const out = { stem, prefixId: null, prefixState: null, subId: null, ses: null, state: null, taskRaw: '', view: null, rep: null, cond: null };
   let i = 0;
   const pm = low[0] && low[0].match(/^p-?(\d+)$/);
   if (pm) {
@@ -576,10 +657,24 @@ function parseName(basename) {
   for (let k = anchor + 1; k < low.length; k++) if (STATE_RE.test(low[k])) { stIdx = k; break; }
   if (stIdx >= 0) out.state = low[stIdx].toUpperCase();
   const taskTok = [];
+  let sawVr = false;
   for (let k = (stIdx >= 0 ? stIdx : anchor) + 1; k < low.length; k++) {
     const t = low[k];
     if (VIEW_RE.test(t)) { out.view = t; break; }
     if (PROC_RE.test(t)) break;
+    // An Elevated / Ground token is the VR condition, not part of the task name.
+    const c = normCond(t);
+    if (c) { out.cond = c; continue; }
+    // "vr" / "vrtrial1" / "vrwalk03" opens a VR task and may carry the trial number.
+    const vm = t.match(VR_TOKEN_RE);
+    if (vm) {
+      sawVr = true;
+      if (!taskTok.includes('vr')) taskTok.push('vr');
+      if (vm[1]) out.rep = parseInt(vm[1], 10);
+      continue;
+    }
+    // After a bare "vr", "walk01" is the trial number rather than a task of its own.
+    if (sawVr) { const rm = t.match(VR_REP_RE); if (rm) { out.rep = parseInt(rm[1], 10); continue; } }
     if (FILLER_RE.test(t)) continue;
     if (taskTok.length && /^(?:t|r|rep|trial)?\d{1,2}$/.test(t)) { out.rep = parseInt(t.match(/\d+/)[0], 10); continue; }
     taskTok.push(t);
@@ -608,8 +703,8 @@ function parseFolders(dirs) {
 
 function canonTask(raw) {
   const s = normKey(raw || '');
-  for (const t of TASKS) if (t.re.test(s)) return { code: t.code, label: t.label, short: t.short, known: true, order: TASK_BY_CODE[t.code].order };
-  return { code: 'x-' + (s || 'none'), label: raw || '(no task)', short: (s || '?').slice(0, 6), known: false, order: 99 };
+  for (const t of TASKS) if (t.re.test(s)) return { code: t.code, label: t.label, short: t.short, known: true, order: TASK_BY_CODE[t.code].order, noGiladi: !!t.noGiladi };
+  return { code: 'x-' + (s || 'none'), label: raw || '(no task)', short: (s || '?').slice(0, 6), known: false, order: 99, noGiladi: false };
 }
 
 /** 53-bit string hash (cyrb53) — used to spot byte-identical copies. */
@@ -818,6 +913,40 @@ function giladiScore(sheet, state, code, metric) {
   return null;
 }
 
+/** The condition the Trial Run Sheet records for a VR trial, e.g. "VR OFF Trial 3 Cond".
+ *  'Cond' is read first and 'Elev' second: where the two disagree in the PD-HRV sheets
+ *  'Cond' is the condition-balanced and more complete field, and 'Elev' holds the typos.
+ *  Returns 'elevated' | 'ground' | null. */
+function sheetVrCondition(sheet, state, rep) {
+  if (!sheet || !state || !rep) return null;
+  const st = state.toLowerCase();
+  for (const field of ['cond', 'elev']) {
+    const k = normKey(`VR ${st} Trial ${rep} ${field}`);
+    if (sheet.norm.has(k)) { const c = normCond(sheet.norm.get(k)); if (c) return c; }
+  }
+  return null;
+}
+
+/** SAM (Self-Assessment Manikin) anxiety rating for a VR trial, from the Trial Run Sheet.
+ *  which: 'baseline' -> "VR OFF Trial 3 SAM Baseline", 'post' -> "... SAM Post-Walk". */
+function sheetVrSam(sheet, state, rep, which) {
+  if (!sheet || !state || !rep) return null;
+  const st = state.toLowerCase();
+  const tails = which === 'post'
+    ? ['SAM Post-Walk', 'SAM PostWalk', 'SAM Post Walk', 'SAM Post']
+    : ['SAM Baseline', 'SAM Base', 'SAM Pre'];
+  for (const tail of tails) {
+    const k = normKey(`VR ${st} Trial ${rep} ${tail}`);
+    if (sheet.norm.has(k)) {
+      const raw = String(sheet.norm.get(k)).trim();
+      if (!raw) return null;
+      const v = parseFloat(raw.replace(',', '.'));
+      return isFinite(v) ? v : null;
+    }
+  }
+  return null;
+}
+
 /** Union FOG annotations (across camera views, and within one file when they are ≤ gap s apart). */
 function mergeEpisodes(eps, gap) {
   const s = eps.filter(x => x.b != null && x.e != null).slice().sort((a, b) => a.b - b.b || a.e - b.e);
@@ -958,6 +1087,7 @@ function analyze(fileRecs, opts = {}) {
       ses: u(L.map(l => l.n.ses || l.f.ses))[0] || null,
       view: u(L.map(l => l.n.view))[0] || null,
       rep: (L.map(l => l.n.rep).find(x => x != null)) ?? null,
+      cond: u(L.map(l => l.n.cond))[0] || null,
       id: curIds[0] || embIds[0] || null,
       state: curStates[0] || embStates[0] || null,
       status: 'ok', conflict: null,
@@ -999,11 +1129,13 @@ function analyze(fileRecs, opts = {}) {
   }
 
   // ── Trials ──
-  const keyOf = (id, ses, state, task, rep) => [id, ses || '', state, task.code, rep ?? ''].join('|');
+  // The VR condition is part of the trial identity: without it an Elevated and a
+  // Ground trial sharing a trial number would merge into one trial.
+  const keyOf = (id, ses, state, task, rep, cond) => [id, ses || '', state, task.code, rep ?? '', cond || ''].join('|');
   const trialMap = new Map();
   for (const lf of logicals) {
     if (lf.status !== 'ok') continue;
-    const key = keyOf(lf.id, lf.ses, lf.state, lf.task, lf.rep);
+    const key = keyOf(lf.id, lf.ses, lf.state, lf.task, lf.rep, lf.cond);
     lf.key = key;
     if (!trialMap.has(key)) trialMap.set(key, []);
     trialMap.get(key).push(lf);
@@ -1021,7 +1153,9 @@ function analyze(fileRecs, opts = {}) {
     files.forEach(f => { for (const [k, v] of Object.entries(f.parsed.manifCounts)) manifCounts[k] = (manifCounts[k] || 0) + v / files.length; });
     const t = {
       key, pid: f0.id, ses: f0.ses, state: f0.state, task: f0.task.code, taskLabel: f0.task.label, taskShort: f0.task.short,
-      taskKnown: f0.task.known, taskOrder: f0.task.order, rep: f0.rep, files,
+      taskKnown: f0.task.known, taskOrder: f0.task.order, noGiladi: !!f0.task.noGiladi, rep: f0.rep, files,
+      isVr: f0.task.code === 'vr', cond: f0.cond, condLabel: f0.cond ? COND_LABEL[f0.cond] : null,
+      sheetCond: null, condSource: null, sam: null,
       views: u(files.map(f => f.view)), nFiles: files.length,
       trialDuration, durSpread: durs.length > 1 ? Math.max(...durs) - Math.min(...durs) : 0,
       episodes, fogEpisodes: episodes.length, rawAnnotations: sum(files.map(f => f.parsed.fogs.length)),
@@ -1031,20 +1165,33 @@ function analyze(fileRecs, opts = {}) {
     };
     trials.push(t);
   }
-  trials.sort((a, b) => a.pid.localeCompare(b.pid) || (a.ses || '').localeCompare(b.ses || '') || (a.state === 'OFF' ? -1 : 1) - (b.state === 'OFF' ? -1 : 1) || a.taskOrder - b.taskOrder || a.taskLabel.localeCompare(b.taskLabel) || (a.rep || 0) - (b.rep || 0));
+  trials.sort((a, b) => a.pid.localeCompare(b.pid) || (a.ses || '').localeCompare(b.ses || '') || (a.state === 'OFF' ? -1 : 1) - (b.state === 'OFF' ? -1 : 1) || a.taskOrder - b.taskOrder || a.taskLabel.localeCompare(b.taskLabel) || (a.rep || 0) - (b.rep || 0) || (a.cond || '').localeCompare(b.cond || ''));
   const multiSession = new Set(trials.map(t => t.ses || '')).size > 1;
-  const tLabel = t => `${pLabel(t.pid)}${multiSession && t.ses ? ' ses' + t.ses : ''} · ${t.state} · ${t.taskLabel}${t.rep ? ' #' + t.rep : ''}`;
+  const tLabel = t => `${pLabel(t.pid)}${multiSession && t.ses ? ' ses' + t.ses : ''} · ${t.state} · ${t.taskLabel}`
+    + (t.condLabel ? ' ' + t.condLabel : '') + (t.rep ? ' #' + t.rep : '');
   trials.forEach(t => { t.label = tLabel(t); });
 
-  // ── Giladi scores ──
+  // ── Giladi scores, and for VR trials the sheet's condition + SAM ratings ──
   for (const t of trials) {
     const s = sheets.get(t.pid);
     if (!s) continue;
     t.sheetName = s.name;
+    if (t.isVr) {
+      t.sheetCond = sheetVrCondition(s, t.state, t.rep);
+      const base = sheetVrSam(s, t.state, t.rep, 'baseline');
+      const post = sheetVrSam(s, t.state, t.rep, 'post');
+      if (base != null || post != null) t.sam = { base, post, delta: (base != null && post != null) ? post - base : null };
+      // The file name is authoritative for which clip this is; the sheet is the cross-check.
+      if (!t.cond && t.sheetCond) { t.cond = t.sheetCond; t.condLabel = COND_LABEL[t.sheetCond]; t.condSource = 'sheet'; }
+      else if (t.cond) t.condSource = 'filename';
+      continue;
+    }
     if (!t.taskKnown) continue;
     const g = { total: giladiScore(s, t.state, t.task, 'Total'), freq: giladiScore(s, t.state, t.task, 'Freq'), dur: giladiScore(s, t.state, t.task, 'Dur') };
     if (g.total != null || g.freq != null || g.dur != null) t.giladi = g;
   }
+  // A condition back-filled from the sheet changes the label, so rebuild them here.
+  trials.forEach(t => { if (t.isVr && !t.condSource && t.cond) t.condSource = 'filename'; t.label = tLabel(t); });
 
   // ── Checks: labels ──
   const occupancy = new Map();
@@ -1059,7 +1206,7 @@ function analyze(fileRecs, opts = {}) {
       const c = lf.conflict;
       const chosen = lf.status === 'ok' ? lf.key : null;
       for (const o of c.options) {
-        o.key = keyOf(o.id, lf.ses, o.state, lf.task, lf.rep);
+        o.key = keyOf(o.id, lf.ses, o.state, lf.task, lf.rep, lf.cond);
         o.others = (occupancy.get(o.key) || 0) - (o.key === chosen ? 1 : 0);
       }
       const lab = x => `${pLabel(x.id)} · ${x.state}`;
@@ -1088,6 +1235,27 @@ function analyze(fileRecs, opts = {}) {
         detail: (sameView ? 'Not separate camera views — possibly a re-annotation or a mislabelled file. ' : `Camera views: ${t.views.join(', ')}. `) + `Episodes are unioned; trial duration is the mean of the files' Trajectory durations${t.durSpread > 0.5 ? ` (they differ by ${t.durSpread.toFixed(2)} s)` : ''}.`,
         paths });
     }
+    if (t.isVr) {
+      if (t.cond && t.sheetCond && t.cond !== t.sheetCond) {
+        add({ sev: 'error', type: 'vr-cond-mismatch', pid: t.pid, state: t.state, task: t.taskLabel,
+          title: `VR condition disagrees with the trial sheet — ${t.label}`,
+          detail: `The file name says ${COND_LABEL[t.cond]}, but “VR ${t.state} Trial ${t.rep} Cond” in ${t.sheetName || 'the trial sheet'} says ${COND_LABEL[t.sheetCond]}. `
+                + 'The file name is used. Check the clip before trusting this trial — one of the two is mislabelled.', paths });
+      } else if (!t.cond) {
+        add({ sev: 'warn', type: 'vr-no-cond', pid: t.pid, state: t.state, task: t.taskLabel,
+          title: `VR trial with no Elevated/Ground condition — ${t.label}`,
+          detail: t.rep
+            ? `Neither the file name nor “VR ${t.state} Trial ${t.rep} Cond” in the trial sheet gives a condition. `
+              + 'The trial is counted in the VR totals but cannot enter the Elevated vs Ground comparison.'
+            : 'The file name carries no trial number either, so the trial sheet cannot be consulted. '
+              + 'Add the trial number and condition to the file name (e.g. …_vr_walk01_elevated_front_blur.txt).', paths });
+      } else if (!t.rep) {
+        add({ sev: 'warn', type: 'vr-no-trial-number', pid: t.pid, state: t.state, task: t.taskLabel,
+          title: `VR trial with no trial number — ${t.label}`,
+          detail: 'The condition is known but the VR trial number is not, so SAM ratings cannot be matched '
+                + 'and two trials of the same condition would merge. Add it as …_vr_walk0N_…', paths });
+      }
+    }
     if (t.trialDuration == null) add({ sev: 'warn', type: 'no-trajectory', pid: t.pid, state: t.state, task: t.taskLabel, title: `No Trajectory annotation — ${t.label}`, detail: '% time frozen cannot be computed for this trial; it is left out of pooled % values.', paths });
     else if (t.pctFrozen > 100) add({ sev: 'warn', type: 'pct-over-100', pid: t.pid, state: t.state, task: t.taskLabel, title: `% time frozen above 100% — ${t.label}`, detail: `FOG ${t.totalFog.toFixed(2)} s vs trial ${t.trialDuration.toFixed(2)} s.`, paths });
   }
@@ -1099,7 +1267,7 @@ function analyze(fileRecs, opts = {}) {
     if (noSheet.length) add({ sev: 'info', type: 'no-sheet', title: `No trial sheet for ${noSheet.length} participant${noSheet.length > 1 ? 's' : ''}`, detail: noSheet.map(pLabel).join(', ') });
     const unused = [...sheets.keys()].filter(p => !pids.includes(p));
     if (unused.length) add({ sev: 'info', type: 'sheet-unused', title: `Trial sheets without ELAN trials: ${unused.map(pLabel).join(', ')}` });
-    const missing = trials.filter(t => sheets.has(t.pid) && t.taskKnown && !t.giladi);
+    const missing = trials.filter(t => sheets.has(t.pid) && t.taskKnown && !t.noGiladi && !t.giladi);
     if (missing.length) add({ sev: 'info', type: 'giladi-missing', title: `${missing.length} trial${missing.length > 1 ? 's have' : ' has'} a trial sheet but no Giladi score for that task/state`, detail: missing.slice(0, 40).map(t => t.label).join('; ') + (missing.length > 40 ? ' …' : '') });
   }
 
@@ -1130,14 +1298,20 @@ function analyze(fileRecs, opts = {}) {
 
   const sevOrder = { error: 0, warn: 1, info: 2 };
   checks.sort((a, b) => sevOrder[a.sev] - sevOrder[b.sev]);
+  const vrTrials = trials.filter(t => t.isVr);
   return {
     trials, logicals, sheets, checks, pids, multiSession, gap,
+    vrTrials, hasVr: vrTrials.length > 0,
+    vrPids: u(vrTrials.map(t => t.pid)).sort(),
     stats: {
       filesLoaded: fileRecs.length, filesIncluded: included.length, excluded: fileRecs.length - included.length,
       elanUnique: logicals.length, dupCopies,
       held: logicals.filter(l => l.status === 'held').length,
       invalid: logicals.filter(l => l.status !== 'ok' && l.status !== 'held').length,
       sheets: sheets.size,
+      vr: vrTrials.length,
+      vrNoCond: vrTrials.filter(t => !t.cond).length,
+      vrMismatch: vrTrials.filter(t => t.cond && t.sheetCond && t.cond !== t.sheetCond).length,
     },
   };
 }
@@ -1159,6 +1333,8 @@ const HAS_FSA = typeof window.showDirectoryPicker === 'function';
 const WANT_EXT = /\.(txt|tsv|csv)$/i;
 const SKIP_DIRS = new Set(['__macosx', '$recycle.bin', 'system volume information']);
 const OFF_C = '#d95926', ON_C = '#199e70', SURFACE = '#16181c', MONO = "'IBM Plex Mono', monospace";
+const ELEV_C = '#a275fc', GRND_C = '#1b6c99';
+const COND_C = { elevated: ELEV_C, ground: GRND_C };
 
 const fileStore = new Map();   // path → { path, name, rootId, text, kind, hash, size, lastModified }
 let roots = [];                // remembered folders: { id, name, handle, status, note, lastScan }
@@ -1168,7 +1344,7 @@ let busy = 0;
 // ── Preferences (per browser; everything still works if storage is blocked) ──
 const PREF_KEY = 'fogAnalyzer.v2';
 const prefs = (() => {
-  const d = { excludedFolders: [], excludedFiles: [], labelChoice: {}, mergeGap: 0.1, autoScan: true, subjMetric: 'pct' };
+  const d = { excludedFolders: [], excludedFiles: [], labelChoice: {}, mergeGap: 0.1, autoScan: true, subjMetric: 'pct', vrMetric: 'pct' };
   try { const raw = localStorage.getItem(PREF_KEY); if (raw) Object.assign(d, JSON.parse(raw)); } catch (e) { /* storage unavailable */ }
   return d;
 })();
@@ -1497,6 +1673,7 @@ function renderAll(m) {
   renderChecks(m);
   renderCoverage(m);
   renderCompare(m);
+  renderVr(m);
   renderCharts(m);
   renderGiladi(m);
   renderTrialFilters(m);
@@ -1516,6 +1693,18 @@ function renderBanner(m) {
 function statCard(label, value, sub, keyColor) {
   return `<div class="stat-card"><div class="label">${keyColor ? `<span class="key" style="background:${keyColor}"></span>` : ''}${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
 }
+function vrStatCard(m) {
+  const e = m.vrTrials.filter(t => t.cond === 'elevated'), g = m.vrTrials.filter(t => t.cond === 'ground');
+  const pe = pooledPct(e), pg = pooledPct(g);
+  const val = pe != null && pg != null
+    ? `${fmt(pe, 1)}<small>% / </small>${fmt(pg, 1)}<small>%</small>`
+    : `${m.vrTrials.length}<small> trials</small>`;
+  const sub = pe != null && pg != null
+    ? `VR % frozen, Elevated / Ground · ${e.length}+${g.length} trials`
+    : `VR plank${m.stats.vrNoCond ? ` · ${m.stats.vrNoCond} without a condition` : ''}`;
+  return `<div class="stat-card"><div class="label"><span class="key" style="background:${ELEV_C}"></span><span class="key" style="background:${GRND_C}"></span>VR plank</div>
+    <div class="value">${val}</div><div class="sub">${sub}</div></div>`;
+}
 function pooledPct(trials) {
   const w = trials.filter(t => t.trialDuration != null);
   const d = sum(w.map(t => t.trialDuration));
@@ -1534,7 +1723,7 @@ function renderSummary(m) {
     statCard('Total FOG time', `${fmt(fog, 1)}<small> s</small>`, `${fmt(fog / 60, 1)} min`, 'var(--fog)'),
     statCard('% time frozen', pct != null ? `${fmt(pct, 1)}<small>%</small>` : '—', `pooled over ${withDur} trial${withDur === 1 ? '' : 's'} with a Trajectory`),
     statCard('Avg episode', eps ? `${fmt(fog / eps, 2)}<small> s</small>` : '—', 'total FOG ÷ episodes'),
-  ].join('');
+  ].concat(m.hasVr ? [vrStatCard(m)] : []).join('');
 }
 
 /* ── Data checks ─────────────────────────────────────────── */
@@ -1584,12 +1773,32 @@ function renderChecks(m) {
 }
 
 /* ── Coverage grid ───────────────────────────────────────── */
-function coverageColumns(m) {
+/** Columns for the coverage grid and the task filter.
+ *  VR splits into one column per condition, because an Elevated and a Ground trial
+ *  are different cells of the design rather than repeats of one task. */
+function coverageColumns(m, splitVr = true) {
   const present = new Set([...m.trials.map(t => t.task), ...m.logicals.map(l => l.task.code)]);
-  const cols = TASKS.filter(t => present.has(t.code)).map(t => ({ code: t.code, short: t.short, label: t.label }));
+  const cols = [];
+  for (const t of TASKS) {
+    if (!present.has(t.code)) continue;
+    if (t.code === 'vr' && splitVr) {
+      for (const c of VR_CONDS) {
+        if (!m.trials.some(x => x.isVr && x.cond === c)) continue;
+        cols.push({ code: 'vr', cond: c, short: 'VR ' + (c === 'elevated' ? 'E' : 'G'), label: `${t.label} · ${COND_LABEL[c]}` });
+      }
+      // Only when a trial really lands there: a file name without a condition whose
+      // trial sheet supplied one belongs in its proper column, not here.
+      if (m.trials.some(x => x.isVr && !x.cond)
+          || m.logicals.some(l => l.task.code === 'vr' && !l.cond && l.status !== 'ok')) {
+        cols.push({ code: 'vr', cond: null, short: 'VR ?', label: `${t.label} · condition unknown` });
+      }
+      continue;
+    }
+    cols.push({ code: t.code, cond: null, short: t.short, label: t.label });
+  }
   const extra = [...present].filter(c => !TASK_BY_CODE[c]).sort().map(c => {
     const l = m.logicals.find(x => x.task.code === c);
-    return { code: c, short: l.task.short, label: l.task.label };
+    return { code: c, cond: null, short: l.task.short, label: l.task.label };
   });
   return cols.concat(extra);
 }
@@ -1606,13 +1815,14 @@ function rowKeysOf(m) {
 function renderCoverage(m) {
   const cols = coverageColumns(m);
   const rows = rowKeysOf(m);
-  const tk = (id, ses, st, code) => [id, m.multiSession ? (ses || '') : '', st, code].join('|');
+  // VR cells are keyed by condition as well, so Elevated and Ground stay in their own columns.
+  const tk = (id, ses, st, code, cond) => [id, m.multiSession ? (ses || '') : '', st, code, code === 'vr' ? (cond || '') : ''].join('|');
   const trialAt = new Map();
-  m.trials.forEach(t => { const k = tk(t.pid, t.ses, t.state, t.task); if (!trialAt.has(k)) trialAt.set(k, []); trialAt.get(k).push(t); });
+  m.trials.forEach(t => { const k = tk(t.pid, t.ses, t.state, t.task, t.cond); if (!trialAt.has(k)) trialAt.set(k, []); trialAt.get(k).push(t); });
   const bad = new Set(), pending = new Set();
   m.logicals.forEach(l => {
-    if (l.status === 'invalid' && l.id && l.state) bad.add(tk(l.id, l.ses, l.state, l.task.code));
-    if (l.status === 'held') l.conflict.options.forEach(o => pending.add(tk(o.id, l.ses, o.state, l.task.code)));
+    if (l.status === 'invalid' && l.id && l.state) bad.add(tk(l.id, l.ses, l.state, l.task.code, l.cond));
+    if (l.status === 'held') l.conflict.options.forEach(o => pending.add(tk(o.id, l.ses, o.state, l.task.code, l.cond)));
   });
   const states = ['OFF', 'ON'];
   const nCol = {};
@@ -1622,18 +1832,24 @@ function renderCoverage(m) {
     states.forEach((st, si) => {
       if (si) body += '<td class="gap"></td>';
       for (const c of cols) {
-        const k = tk(r.id, r.ses, st, c.code);
+        const k = tk(r.id, r.ses, st, c.code, c.cond);
         const ts = trialAt.get(k);
         if (ts && ts.length) {
-          nCol[st + c.code] = (nCol[st + c.code] || 0) + 1;
+          nCol[st + c.code + (c.cond || '')] = (nCol[st + c.code + (c.cond || '')] || 0) + ts.length;
           const t = ts[0];
-          const pct = t.pctFrozen;
+          // With VR a cell can hold several trials of the same condition; pool them
+          // rather than showing only the first, and mark the cell with the count.
+          const pct = ts.length > 1 ? pooledPct(ts) : t.pctFrozen;
           // square-root scale so low values stay distinguishable; the number is printed in the cell anyway
           const a = pct == null ? 0.05 : 0.05 + 0.85 * Math.sqrt(Math.min(pct, 100) / 100);
-          const txt = pct == null ? 'n/a' : pct < 0.5 && t.totalFog > 0 ? '<1' : String(Math.round(pct));
-          const tip = `${t.label}${ts.length > 1 ? ` (+${ts.length - 1} repeat)` : ''} — ${t.fogEpisodes} episode${t.fogEpisodes === 1 ? '' : 's'}, ${fmt(t.totalFog, 2)} s FOG, ${pct == null ? 'no Trajectory' : fmt(pct, 1) + '% frozen'}${t.nFiles > 1 ? `, merged from ${t.nFiles} files` : ''}${pending.has(k) ? ' · a held-out file could also go here' : ''}`;
-          const cls = a > 0.55 ? ' dark' : t.fogEpisodes === 0 ? ' zero' : '';
-          body += `<td class="cell${cls}" style="--a:${a.toFixed(3)}" title="${esc(tip)}">${txt}${t.nFiles > 1 ? `<sup>${t.nFiles}</sup>` : ''}${pending.has(k) ? '<sup>?</sup>' : ''}</td>`;
+          const txt = pct == null ? 'n/a' : pct < 0.5 && sum(ts.map(x => x.totalFog)) > 0 ? '<1' : String(Math.round(pct));
+          const nEps = sum(ts.map(x => x.fogEpisodes)), tFog = sum(ts.map(x => x.totalFog));
+          const tip = ts.length > 1
+            ? `${ts.map(x => x.label).join(' + ')} — ${ts.length} trials pooled: ${nEps} episode${nEps === 1 ? '' : 's'}, ${fmt(tFog, 2)} s FOG, ${pct == null ? 'no Trajectory' : fmt(pct, 1) + '% frozen'}`
+            : `${t.label} — ${t.fogEpisodes} episode${t.fogEpisodes === 1 ? '' : 's'}, ${fmt(t.totalFog, 2)} s FOG, ${pct == null ? 'no Trajectory' : fmt(pct, 1) + '% frozen'}${t.nFiles > 1 ? `, merged from ${t.nFiles} files` : ''}${pending.has(k) ? ' · a held-out file could also go here' : ''}`;
+          const cls = a > 0.55 ? ' dark' : nEps === 0 ? ' zero' : '';
+          const mark = ts.length > 1 ? `<sup>×${ts.length}</sup>` : t.nFiles > 1 ? `<sup>${t.nFiles}</sup>` : '';
+          body += `<td class="cell${cls}" style="--a:${a.toFixed(3)}" title="${esc(tip)}">${txt}${mark}${pending.has(k) ? '<sup>?</sup>' : ''}</td>`;
         } else if (bad.has(k)) {
           body += `<td class="cell bad" title="${esc(`${pLabel(r.id)} · ${st} · ${c.label} — export could not be read`)}">!</td>`;
         } else if (pending.has(k)) {
@@ -1647,13 +1863,13 @@ function renderCoverage(m) {
   }
   const head1 = `<tr><th></th>${states.map((st, si) => `${si ? '<th class="gap"></th>' : ''}<th class="grp" colspan="${cols.length}"><span class="dot dot-${st.toLowerCase()}"></span>${st}</th>`).join('')}</tr>`;
   const head2 = `<tr><th></th>${states.map((st, si) => `${si ? '<th class="gap"></th>' : ''}${cols.map(c => `<th title="${esc(c.label)}">${esc(c.short)}</th>`).join('')}`).join('')}</tr>`;
-  const nrow = `<tr class="nrow"><th class="pid">n</th>${states.map((st, si) => `${si ? '<td class="gap"></td>' : ''}${cols.map(c => `<td>${nCol[st + c.code] || 0}</td>`).join('')}`).join('')}</tr>`;
+  const nrow = `<tr class="nrow"><th class="pid">n</th>${states.map((st, si) => `${si ? '<td class="gap"></td>' : ''}${cols.map(c => `<td>${nCol[st + c.code + (c.cond || '')] || 0}</td>`).join('')}`).join('')}</tr>`;
   $('coverageWrap').innerHTML = `<table class="cov"><thead>${head1}${head2}</thead><tbody>${body}${nrow}</tbody></table>
     <div class="cov-legend"><span>% time frozen: 0<span class="ramp"></span>100 (√ scale)</span>
       <span><span class="sym" style="box-shadow:inset 0 0 0 1px var(--border)">·</span> no file</span>
       <span><span class="sym" style="background:rgba(239,154,154,0.14);color:var(--err)">!</span> export unreadable</span>
       <span><span class="sym" style="box-shadow:inset 0 0 0 1px rgba(255,183,77,0.5);color:var(--warn)">?</span> held-out file could go here</span>
-      <span><sup>2</sup> merged from 2 files</span><span>n/a = no Trajectory</span></div>`;
+      <span><sup>2</sup> merged from 2 files</span><span><sup>×2</sup> 2 trials pooled</span><span>n/a = no Trajectory</span></div>`;
 }
 
 /* ── OFF vs ON ───────────────────────────────────────────── */
@@ -1701,6 +1917,92 @@ function renderCompare(m) {
       <td>${pair(a, b, x => n(x) && x.avg != null ? fmt(x.avg, 2) : '—')}</td></tr>`;
   }).join('');
   $('subjectCompareWrap').innerHTML = `<table class="data"><thead><tr><th>Participant</th><th>Trials OFF / ON</th><th>Episodes OFF / ON</th><th>FOG s OFF / ON</th><th>% frozen OFF / ON</th><th title="Difference in pooled % time frozen, ON minus OFF, over tasks recorded in both states">Δ % frozen (ON−OFF, matched)</th><th>Avg ep s OFF / ON</th></tr></thead><tbody>${body}</tbody></table>`;
+}
+
+/* ── VR plank · Elevated vs Ground ───────────────────────── */
+const VR_CONDS = ['elevated', 'ground'];
+/** The 2×2 of medication state × VR condition, plus the per-participant table. */
+function renderVr(m) {
+  $('vrSection').hidden = !m.hasVr;
+  if (!m.hasVr) return;
+  const V = m.vrTrials;
+  // A trial whose file name and trial sheet disagree about the condition is not
+  // assigned to either cell — which cell it belongs in is exactly what is in doubt.
+  const withCond = V.filter(t => t.cond && !(t.sheetCond && t.sheetCond !== t.cond));
+  $('vrCounts').innerHTML = `<span class="muted">${V.length} VR trial${V.length === 1 ? '' : 's'} · `
+    + `${m.vrPids.length} participant${m.vrPids.length === 1 ? '' : 's'}</span>`;
+
+  const parts = [];
+  if (m.stats.vrMismatch) parts.push(`${m.stats.vrMismatch} trial${m.stats.vrMismatch > 1 ? 's' : ''} whose file name and trial sheet disagree about the condition`);
+  if (m.stats.vrNoCond) parts.push(`${m.stats.vrNoCond} trial${m.stats.vrNoCond > 1 ? 's' : ''} with no Elevated/Ground condition`);
+  $('vrBanner').innerHTML = parts.length
+    ? `<div class="banner"><span class="sev">▲</span><span>${parts.join(' · ')} — left out of the Elevated vs Ground numbers.</span><button class="btn-mini" type="button" data-act="goto-checks">Review in Data checks</button></div>`
+    : '';
+
+  // ── 2×2 matrix: rows = condition, cols = state. Magnitude on the amber ramp,
+  //    identity by row/column header, and every tile prints its value.
+  const cell = (st, cond) => {
+    const arr = withCond.filter(t => t.state === st && t.cond === cond);
+    if (!arr.length) return '<td class="vcell empty">no trials</td>';
+    const pct = pooledPct(arr), eps = sum(arr.map(t => t.fogEpisodes)), fog = sum(arr.map(t => t.totalFog));
+    const nPid = new Set(arr.map(t => t.pid)).size;
+    const a = pct == null ? 0.05 : 0.05 + 0.85 * Math.sqrt(Math.min(pct, 100) / 100);
+    const sam = arr.map(t => t.sam && t.sam.base).filter(v => v != null);
+    return `<td class="vcell${a > 0.55 ? ' dark' : ''}" style="--a:${a.toFixed(3)}">
+      <div class="vbig">${pct != null ? fmt(pct, 1) + '%' : '—'}</div>
+      <div class="vsub">${arr.length} trial${arr.length === 1 ? '' : 's'} · ${nPid} participant${nPid === 1 ? '' : 's'}<br>
+        ${eps} episode${eps === 1 ? '' : 's'} · ${fmt(fog, 1)} s FOG<br>
+        avg ep ${eps ? fmt(fog / eps, 2) + ' s' : '—'}${sam.length ? `<br>SAM base ${fmt(mean(sam), 1)}` : ''}</div></td>`;
+  };
+  const rowDelta = cond => {
+    const o = pooledPct(withCond.filter(t => t.state === 'OFF' && t.cond === cond));
+    const n = pooledPct(withCond.filter(t => t.state === 'ON' && t.cond === cond));
+    return o != null && n != null ? `<td class="vr-delta">${(n - o > 0 ? '+' : '')}${fmt(n - o, 1)} pts</td>` : '<td class="muted2">—</td>';
+  };
+  const colDelta = st => {
+    const e = pooledPct(withCond.filter(t => t.state === st && t.cond === 'elevated'));
+    const g = pooledPct(withCond.filter(t => t.state === st && t.cond === 'ground'));
+    return e != null && g != null ? `<td class="vr-delta">${(e - g > 0 ? '+' : '')}${fmt(e - g, 1)} pts</td>` : '<td class="muted2">—</td>';
+  };
+  $('vrMatrix').innerHTML = `
+    <thead><tr><th></th><th class="ch"><span class="dot dot-off"></span>OFF</th><th class="ch"><span class="dot dot-on"></span>ON</th>
+      <th class="ch" title="Pooled % time frozen, ON minus OFF">Δ ON−OFF</th></tr></thead>
+    <tbody>
+      ${VR_CONDS.map(c => `<tr><th><span class="dot dot-${c}"></span>${COND_LABEL[c]}</th>${cell('OFF', c)}${cell('ON', c)}${rowDelta(c)}</tr>`).join('')}
+      <tr><th title="Pooled % time frozen, Elevated minus Ground">Δ Elev−Grnd</th>${colDelta('OFF')}${colDelta('ON')}<td></td></tr>
+    </tbody>`;
+  $('vrMatrixLegend').innerHTML = `<span>Each tile: pooled % time frozen = Σ FOG ÷ Σ trial duration (√-scaled amber fill, value printed)</span>
+    <span>Δ values are percentage points</span>`;
+
+  renderVrSubjectChart(m);
+  renderVrSam(m);
+
+  // ── Per-participant VR trials
+  const rows = m.vrPids.map(pid => {
+    const mine = V.filter(t => t.pid === pid);
+    const td = (st, cond) => {
+      const arr = mine.filter(t => t.state === st && t.cond === cond);
+      if (!arr.length) return '<td class="muted2">—</td>';
+      const p = pooledPct(arr);
+      return `<td>${p != null ? fmt(p, 1) + '%' : 'n/a'}<span class="sub">${arr.map(t => 'T' + (t.rep ?? '?')).join(',')}</span></td>`;
+    };
+    const samCell = st => {
+      const arr = mine.filter(t => t.state === st && t.sam);
+      if (!arr.length) return '<td class="muted2">—</td>';
+      const e = arr.filter(t => t.cond === 'elevated').map(t => t.sam.base).filter(v => v != null);
+      const g = arr.filter(t => t.cond === 'ground').map(t => t.sam.base).filter(v => v != null);
+      return `<td>${e.length ? fmt(mean(e), 1) : '–'}<span class="sep">/</span>${g.length ? fmt(mean(g), 1) : '–'}</td>`;
+    };
+    return `<tr><td>${pLabel(pid)}</td>${td('OFF', 'elevated')}${td('OFF', 'ground')}${td('ON', 'elevated')}${td('ON', 'ground')}
+      ${samCell('OFF')}${samCell('ON')}<td>${mine.length}</td></tr>`;
+  }).join('');
+  $('vrTrialWrap').innerHTML = `<table class="data"><thead><tr><th rowspan="2">Participant</th>
+      <th colspan="2"><span class="dot dot-off"></span>OFF · % frozen</th>
+      <th colspan="2"><span class="dot dot-on"></span>ON · % frozen</th>
+      <th colspan="2" title="Mean SAM baseline rating, Elevated / Ground">SAM base · Elev / Grnd</th>
+      <th rowspan="2">Trials</th></tr>
+    <tr><th>Elevated</th><th>Ground</th><th>Elevated</th><th>Ground</th><th>OFF</th><th>ON</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
 }
 
 /* ── Charts ──────────────────────────────────────────────── */
@@ -1753,18 +2055,92 @@ function renderSubjectChart(m) {
 }
 function renderTaskChart(m) {
   const cols = coverageColumns(m);
-  const val = (code, st) => { const arr = m.trials.filter(t => t.task === code && t.state === st); return arr.length ? pooledPct(arr) : null; };
+  const pick = (c, st) => m.trials.filter(t => t.task === c.code && t.state === st && (c.code !== 'vr' || (t.cond || null) === c.cond));
+  const val = (c, st) => { const arr = pick(c, st); return arr.length ? pooledPct(arr) : null; };
   makeChart('chartByTask', {
     type: 'bar',
-    data: { labels: cols.map(c => c.label), datasets: [barDataset('OFF', cols.map(c => val(c.code, 'OFF')), OFF_C), barDataset('ON', cols.map(c => val(c.code, 'ON')), ON_C)] },
+    data: { labels: cols.map(c => c.label), datasets: [barDataset('OFF', cols.map(c => val(c, 'OFF')), OFF_C), barDataset('ON', cols.map(c => val(c, 'ON')), ON_C)] },
     options: {
       responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
       plugins: { legend: legendBase(), tooltip: Object.assign(tooltipBase(), { callbacks: { label: c => {
         if (c.parsed.y == null) return null;
-        const n = m.trials.filter(t => t.task === cols[c.dataIndex].code && t.state === c.dataset.label).length;
+        const n = pick(cols[c.dataIndex], c.dataset.label).length;
         return `${c.dataset.label}: ${fmt(c.parsed.y, 1)}% (${n} trials)`;
       } } }) },
       scales: { x: axisBase(null, { grid: { display: false }, ticks: { color: '#8a90a0', font: { family: MONO, size: 9 }, maxRotation: 40, autoSkip: false } }), y: axisBase('% time frozen (pooled)', { beginAtZero: true }) },
+    },
+  });
+}
+/** VR metric per participant, Elevated vs Ground. Only these two series share the
+ *  frame, so the validated condition pair carries identity; OFF and ON are split
+ *  into stacked x-groups rather than becoming two more hues. */
+function renderVrSubjectChart(m) {
+  const metric = SUBJ_METRICS[prefs.vrMetric] ? prefs.vrMetric : 'pct';
+  document.querySelectorAll('#vrMetricSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.metric === metric)));
+  const M = SUBJ_METRICS[metric];
+  const states = ['OFF', 'ON'].filter(st => m.vrTrials.some(t => t.state === st));
+  // Only participant × state slots that actually hold a VR trial — an empty slot is
+  // a gap in the x-axis, not a zero.
+  const cells = [];
+  for (const pid of m.vrPids) for (const st of states) {
+    if (m.vrTrials.some(t => t.pid === pid && t.state === st)) cells.push({ pid, st });
+  }
+  const val = (c, cond) => {
+    const arr = m.vrTrials.filter(t => t.pid === c.pid && t.state === c.st && t.cond === cond);
+    return arr.length ? M.fn(arr) : null;
+  };
+  makeChart('chartVrSubject', {
+    type: 'bar',
+    data: {
+      labels: cells.map(c => `${pLabel(c.pid)} ${c.st}`),
+      datasets: VR_CONDS.map(cond => barDataset(COND_LABEL[cond], cells.map(c => val(c, cond)), COND_C[cond])),
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: legendBase(),
+        tooltip: Object.assign(tooltipBase(), { callbacks: { label: c => c.parsed.y == null ? null : `${c.dataset.label}: ${M.f(c.parsed.y)}` } }),
+      },
+      scales: {
+        x: axisBase(null, { grid: { display: false }, ticks: { color: '#8a90a0', font: { family: MONO, size: 9 }, maxRotation: 60, autoSkip: false } }),
+        y: axisBase(M.title, { beginAtZero: true }),
+      },
+    },
+  });
+}
+/** SAM anxiety rating against % time frozen, one point per VR trial. */
+function renderVrSam(m) {
+  const pts = { elevated: [], ground: [] };
+  for (const t of m.vrTrials) {
+    if (!t.cond || !t.sam || t.sam.base == null || t.pctFrozen == null) continue;
+    pts[t.cond].push({ x: t.sam.base, y: t.pctFrozen, label: t.label });
+  }
+  const all = [...pts.elevated, ...pts.ground];
+  const rho = all.length >= 3 ? spearman(all.map(p => p.x), all.map(p => p.y)) : null;
+  $('rVrSam').textContent = rho == null ? 'ρ —' : `ρ ${fmt(rho, 2)} · n ${all.length}`;
+  if (!all.length) {
+    const w = $('chartVrSam').parentElement;
+    w.innerHTML = `<canvas id="chartVrSam" hidden></canvas><div class="chart-note">No SAM ratings matched — add the Trial Run Sheets, and make sure the VR file names carry the trial number.</div>`;
+    return;
+  }
+  makeChart('chartVrSam', {
+    type: 'scatter',
+    data: {
+      datasets: VR_CONDS.filter(c => pts[c].length).map(c => ({
+        label: COND_LABEL[c], data: pts[c], backgroundColor: COND_C[c], borderColor: SURFACE, borderWidth: 2,
+        pointRadius: 5, pointHoverRadius: 7, pointStyle: c === 'elevated' ? 'circle' : 'rectRot',
+      })),
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: legendBase(),
+        tooltip: Object.assign(tooltipBase(), { callbacks: { label: c => `${c.raw.label} — SAM ${c.parsed.x}, ${fmt(c.parsed.y, 1)}% frozen` } }),
+      },
+      scales: {
+        x: axisBase('SAM baseline (anxiety)', { beginAtZero: true, suggestedMax: 9 }),
+        y: axisBase('% time frozen', { beginAtZero: true }),
+      },
     },
   });
 }
@@ -1932,37 +2308,42 @@ function episodeTable(t) {
 }
 function renderTaskTable(m) {
   const fp = $('fPid').value, fs = $('fState').value, ft = $('fTask').value, fogOnly = $('fFogOnly').checked;
-  const T = m.trials.filter(t => (!fp || t.pid === fp) && (!fs || t.state === fs) && (!ft || t.task === ft) && (!fogOnly || t.fogEpisodes > 0));
+  const fc = $('fCond').value;
+  const condOk = t => !fc || (fc === 'none' ? !t.cond : t.cond === fc);
+  const T = m.trials.filter(t => (!fp || t.pid === fp) && (!fs || t.state === fs) && (!ft || t.task === ft) && condOk(t) && (!fogOnly || t.fogEpisodes > 0));
   const groups = new Map();
   T.forEach(t => { const k = t.pid + (m.multiSession ? ' ses' + (t.ses || '') : ''); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t); });
   let html = '';
   for (const [gk, arr] of groups) {
     const open = openSubjects.has(gk) || !!fp || groups.size === 1;
     const eps = sum(arr.map(t => t.fogEpisodes)), fog = sum(arr.map(t => t.totalFog)), pct = pooledPct(arr);
-    html += `<tr class="subject-row ${open ? 'open' : ''}" data-act="toggle-subject" data-key="${esc(gk)}" tabindex="0"><td colspan="10"><span class="caret">▸</span>${esc(pLabel(arr[0].pid))}${m.multiSession ? ' ses' + esc(arr[0].ses || '') : ''}<span class="sub-meta">${arr.length} trial${arr.length === 1 ? '' : 's'} · ${eps} ep · ${fmt(fog, 1)} s FOG · ${pct != null ? fmt(pct, 1) + '% frozen' : '—'}</span></td></tr>`;
+    html += `<tr class="subject-row ${open ? 'open' : ''}" data-act="toggle-subject" data-key="${esc(gk)}" tabindex="0"><td colspan="11"><span class="caret">▸</span>${esc(pLabel(arr[0].pid))}${m.multiSession ? ' ses' + esc(arr[0].ses || '') : ''}<span class="sub-meta">${arr.length} trial${arr.length === 1 ? '' : 's'} · ${eps} ep · ${fmt(fog, 1)} s FOG · ${pct != null ? fmt(pct, 1) + '% frozen' : '—'}</span></td></tr>`;
     if (!open) continue;
     for (const st of ['OFF', 'ON']) {
       const sd = arr.filter(t => t.state === st);
       if (!sd.length) continue;
-      html += `<tr class="state-group-row"><td colspan="10"><span class="dot dot-${st.toLowerCase()}"></span>${st} · ${sd.length} trial${sd.length === 1 ? '' : 's'} · ${sum(sd.map(t => t.fogEpisodes))} ep · ${fmt(sum(sd.map(t => t.totalFog)), 1)} s FOG</td></tr>`;
+      html += `<tr class="state-group-row"><td colspan="11"><span class="dot dot-${st.toLowerCase()}"></span>${st} · ${sd.length} trial${sd.length === 1 ? '' : 's'} · ${sum(sd.map(t => t.fogEpisodes))} ep · ${fmt(sum(sd.map(t => t.totalFog)), 1)} s FOG</td></tr>`;
       for (const t of sd) {
         const ex = openTrials.has(t.key);
         const pctW = t.pctFrozen != null ? Math.min(t.pctFrozen, 100).toFixed(1) : 0;
-        const g = t.giladi ? [t.giladi.total, t.giladi.freq, t.giladi.dur].map(v => v == null ? '–' : v).join('·') : '<span class="muted2">—</span>';
+        const g = t.isVr
+          ? (t.sam ? `<span title="SAM baseline / post-walk">SAM ${t.sam.base ?? '–'}<span class="sep">/</span>${t.sam.post ?? '–'}</span>` : '<span class="muted2">n/a</span>')
+          : t.giladi ? [t.giladi.total, t.giladi.freq, t.giladi.dur].map(v => v == null ? '–' : v).join('·') : '<span class="muted2">—</span>';
         html += `<tr class="task-row ${ex ? 'expanded' : ''}" data-act="toggle-trial" data-key="${esc(t.key)}">
           <td class="task-name">${esc(t.taskLabel)}${t.rep ? ` <span class="rep">#${t.rep}</span>` : ''}${t.nFiles > 1 ? ` <span class="views">${t.nFiles} files</span>` : t.views[0] && t.views[0] !== 'front' ? ` <span class="views">${esc(t.views[0])}</span>` : ''}</td>
           <td><span class="dot dot-${t.state.toLowerCase()}"></span>${t.state}</td>
+          <td>${t.cond ? `<span class="dot dot-${t.cond}"></span>${t.condLabel}${t.condSource === 'sheet' ? '<span class="cond-tag" title="taken from the trial sheet; the file name had none">from sheet</span>' : ''}${t.sheetCond && t.sheetCond !== t.cond ? `<span class="cond-tag bad" title="the trial sheet says ${COND_LABEL[t.sheetCond]} — see Data checks">≠ sheet</span>` : ''}` : t.isVr ? '<span class="muted2">unknown</span>' : '<span class="muted2">—</span>'}</td>
           <td>${t.trialDuration != null ? fmt(t.trialDuration, 2) : '<span class="muted">none</span>'}</td>
           <td>${t.fogEpisodes}</td><td>${fmt(t.totalFog, 3)}</td>
           <td><div class="mini-bar-wrap"><div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${pctW}%"></div></div>${t.pctFrozen != null ? fmt(t.pctFrozen, 1) + '%' : '—'}</div></td>
           <td>${t.fogEpisodes ? fmt(t.avgEpisode, 3) : '—'}</td>
           <td>${manifPills(t.manifCounts)}</td><td>${g}</td>
           <td><button class="expand-btn ${ex ? 'open' : ''}" type="button" data-act="toggle-trial" data-key="${esc(t.key)}"><span class="arrow">▶</span> ${t.fogEpisodes ? t.fogEpisodes + ' ep' : 'details'}</button></td></tr>`;
-        if (ex) html += `<tr class="episode-detail-row"><td colspan="10"><div class="episode-inner"><div class="episode-table-label">${esc(t.label)}</div>${episodeTable(t)}</div></td></tr>`;
+        if (ex) html += `<tr class="episode-detail-row"><td colspan="11"><div class="episode-inner"><div class="episode-table-label">${esc(t.label)}</div>${episodeTable(t)}</div></td></tr>`;
       }
     }
   }
-  $('taskTableBody').innerHTML = html || '<tr><td colspan="10" class="no-data">No trials match the filters.</td></tr>';
+  $('taskTableBody').innerHTML = html || '<tr><td colspan="11" class="no-data">No trials match the filters.</td></tr>';
 }
 
 /* ── Methods ─────────────────────────────────────────────── */
@@ -1979,6 +2360,15 @@ function renderMethods(m) {
       <li>Task codes found in your files and the task each maps to. The task name is also the trial-sheet key it is matched against, e.g. <code>Giladi OFF DualTask Turns Total</code>:</li>
     </ul>
     ${mapRows ? `<table class="mini-table"><thead><tr><th>Task</th><th>Codes seen in file names</th></tr></thead><tbody>${mapRows}</tbody></table>` : ''}
+    <h4>VR plank trials</h4>
+    <ul>
+      <li>A <code>vr</code> token in the task position makes the trial a VR plank trial: <code>…_off_vr_walk01_elevated_front_blur.txt</code>, and the older <code>…_off_VRtrial1_elevated_…</code> spelling. <code>walk01</code> / <code>VRtrial1</code> is read as the <b>VR trial number</b>, and <code>elevated</code> / <code>ground</code> as the condition — neither becomes part of the task name.</li>
+      <li>The condition is part of the trial's identity, so an Elevated and a Ground trial never merge into one trial even when everything else about the name matches.</li>
+      <li>The <b>file name is authoritative</b> for the condition. The trial sheet's <code>VR ${'<state>'} Trial N Cond</code> is the cross-check: where the two disagree the trial is flagged as an error in Data checks and left out of the Elevated vs Ground numbers. Where the file name has no condition but the sheet does, the sheet's value is used and marked <code>sheet</code> in the table.</li>
+      <li>The trial number is what matches a trial to its sheet row, so a VR file without one gets no condition cross-check and no SAM ratings.</li>
+      <li>VR has <b>no Giladi counterpart</b> — Giladi covers the over-ground protocol only — so VR trials are never counted as missing a Giladi score. The Giladi column shows their SAM baseline / post-walk ratings instead.</li>
+      <li>Counting the VR trial number is not the same as counting annotated files: a session whose condition order starts Elevated-Elevated has its first Ground trial at trial 3, so its two annotated clips are <code>walk01</code> and <code>walk03</code>.</li>
+    </ul>
     <h4>Episodes and durations</h4>
     <ul>
       <li>Trial duration is the span of the <code>Trajectory</code> annotation(s) on the Task tier. Trials without one get no % time frozen and are left out of the pooled % values.</li>
@@ -1991,6 +2381,11 @@ function renderMethods(m) {
       <li>% time frozen (pooled) = Σ FOG time ÷ Σ trial duration, over trials with a Trajectory. It weights long trials more than a mean of per-trial percentages would.</li>
       <li>Avg episode = Σ FOG time ÷ Σ episodes.</li>
       <li>“Matched” OFF/ON values use only tasks recorded in both states for the same participant, so OFF and ON cover the same tasks.</li>
+      <li>In the VR 2×2 each tile pools over the trials in that state × condition cell; the Δ rows and columns are differences in percentage points, not ratios. The cells are not matched pairs — a participant missing one cell still contributes to the others, so read the Δ alongside the per-participant table.</li>
+    </ul>
+    <h4>Colour</h4>
+    <ul>
+      <li>OFF/ON (<span style="color:${OFF_C}">■</span><span style="color:${ON_C}">■</span>) and Elevated/Ground (<span style="color:${ELEV_C}">■</span><span style="color:${GRND_C}">■</span>) are two validated two-colour pairs, each separated well past the ΔE ≥ 8 colour-vision threshold on this surface. Four categorical hues cannot all clear that threshold here, so the two pairs are never drawn in one frame: the VR 2×2 encodes magnitude on the amber ramp and identity by row and column instead, and every tile prints its value.</li>
     </ul>
     <h4>Correlations</h4>
     <ul>
@@ -2021,17 +2416,22 @@ function stamp() {
 }
 function exportTrials() {
   if (!model) return;
-  const head = ['Participant_ID', 'State', 'Task_Name', 'ELAN_Source_Files', 'Trial_Duration_s', 'FOG_Episodes_Count', 'Total_FOG_Duration_s', 'Percent_Time_Frozen', 'Avg_Episode_Duration_s', 'Manifestations', 'Giladi_Matched_Task', 'Giladi_Total_Score', 'Giladi_Frequency_Score', 'Giladi_Duration_Score',
+  const head = ['Participant_ID', 'State', 'Task_Name', 'VR_Condition', 'VR_Trial', 'ELAN_Source_Files', 'Trial_Duration_s', 'FOG_Episodes_Count', 'Total_FOG_Duration_s', 'Percent_Time_Frozen', 'Avg_Episode_Duration_s', 'Manifestations', 'Giladi_Matched_Task', 'Giladi_Total_Score', 'Giladi_Frequency_Score', 'Giladi_Duration_Score',
+    'SAM_Baseline', 'SAM_Post_Walk', 'SAM_Delta', 'VR_Condition_Source', 'VR_Condition_Sheet', 'VR_Condition_Agrees',
     'Session', 'Task_Code', 'Repeat', 'N_Files', 'Views', 'FOG_Annotations_Raw', 'Source_Paths'];
   const rows = [head];
   for (const t of model.trials) {
     const g = t.giladi || {};
+    const sam = t.sam || {};
     rows.push([
-      pLabel(t.pid), t.state, t.taskLabel, t.files.map(f => f.primary.name).join(' | '),
+      pLabel(t.pid), t.state, t.taskLabel, t.condLabel || '', t.isVr ? (t.rep ?? '') : '', t.files.map(f => f.primary.name).join(' | '),
       t.trialDuration != null ? t.trialDuration.toFixed(2) : '', t.fogEpisodes, t.totalFog.toFixed(3),
       t.pctFrozen != null ? t.pctFrozen.toFixed(2) : '', t.fogEpisodes ? t.avgEpisode.toFixed(3) : '',
       Object.entries(t.manifCounts).map(([k, v]) => `${k}:${v.toFixed(1)}`).join('; '),
-      t.taskKnown ? t.taskLabel : 'No Giladi Match', g.total ?? '', g.freq ?? '', g.dur ?? '',
+      t.noGiladi ? 'No Giladi (VR)' : t.taskKnown ? t.taskLabel : 'No Giladi Match', g.total ?? '', g.freq ?? '', g.dur ?? '',
+      sam.base ?? '', sam.post ?? '', sam.delta ?? '',
+      t.condSource || '', t.sheetCond ? COND_LABEL[t.sheetCond] : '',
+      t.isVr && t.cond && t.sheetCond ? (t.cond === t.sheetCond ? 'yes' : 'NO') : '',
       t.ses || '', t.task, t.rep ?? '', t.nFiles, t.views.join('+'), t.rawAnnotations, t.files.map(f => f.primary.path).join(' | '),
     ]);
   }
@@ -2039,9 +2439,9 @@ function exportTrials() {
 }
 function exportEpisodes() {
   if (!model) return;
-  const rows = [['Participant_ID', 'Session', 'State', 'Task_Name', 'Task_Code', 'Repeat', 'Episode', 'Begin_s', 'End_s', 'Duration_s', 'Begin_hms', 'End_hms', 'Manifestation', 'Notes', 'Merged_Annotations', 'Trial_Duration_s', 'Source_Files']];
+  const rows = [['Participant_ID', 'Session', 'State', 'Task_Name', 'VR_Condition', 'Task_Code', 'Repeat', 'Episode', 'Begin_s', 'End_s', 'Duration_s', 'Begin_hms', 'End_hms', 'Manifestation', 'Notes', 'Merged_Annotations', 'Trial_Duration_s', 'Source_Files']];
   for (const t of model.trials) for (const ep of t.episodes) {
-    rows.push([pLabel(t.pid), t.ses || '', t.state, t.taskLabel, t.task, t.rep ?? '', ep.index, ep.b.toFixed(3), ep.e.toFixed(3), ep.dur.toFixed(3), fmtHMS(ep.b), fmtHMS(ep.e),
+    rows.push([pLabel(t.pid), t.ses || '', t.state, t.taskLabel, t.condLabel || '', t.task, t.rep ?? '', ep.index, ep.b.toFixed(3), ep.e.toFixed(3), ep.dur.toFixed(3), fmtHMS(ep.b), fmtHMS(ep.e),
       [...ep.manifs].join('; '), [...ep.notes].join(' | '), ep.parts, t.trialDuration != null ? t.trialDuration.toFixed(2) : '', [...ep.srcs].map(i => t.files[i].primary.name).join(' | ')]);
   }
   download(rows, `PDHRV_FOG_Episodes_${stamp()}.csv`);
@@ -2190,7 +2590,13 @@ function wire() {
     if (model) renderSubjectChart(model);
   });
   $('highlightSel').addEventListener('change', () => { if (model) renderGiladi(model); });
-  ['fPid', 'fState', 'fTask', 'fFogOnly'].forEach(id => $(id).addEventListener('change', () => { if (model) renderTaskTable(model); }));
+  ['fPid', 'fState', 'fTask', 'fCond', 'fFogOnly'].forEach(id => $(id).addEventListener('change', () => { if (model) renderTaskTable(model); }));
+  $('vrMetricSeg').addEventListener('click', e => {
+    const b = e.target.closest('button[data-metric]');
+    if (!b) return;
+    prefs.vrMetric = b.dataset.metric; savePrefs();
+    if (model) renderVrSubjectChart(model);
+  });
   $('expandAllBtn').addEventListener('click', () => { if (!model) return; model.pids.forEach(p => { openSubjects.add(p); }); model.trials.forEach(t => openSubjects.add(t.pid + (model.multiSession ? ' ses' + (t.ses || '') : ''))); renderTaskTable(model); });
   $('collapseAllBtn').addEventListener('click', () => { openSubjects.clear(); openTrials.clear(); if (model) renderTaskTable(model); });
   $('exportTrialsBtn').addEventListener('click', exportTrials);
